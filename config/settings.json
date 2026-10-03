@@ -1,0 +1,5 @@
+{
+  "attendance": { "workPatternCode": "205", "remoteReasonCode": "007", "officeReasonCode": null, "paidLeaveReasonCode": "040" },
+  "files": { "inputDirectory": "input", "backupDirectory": "filesback", "supportedExtensions": [".xls", ".xlsx"], "backupTimestampFormat": "yyyyMMddHHmmss" },
+  "browser": { "remoteDebuggingPort": 9222, "userDataDirectory": ".runtime/edge-profile", "executablePath": null, "selectorsFile": "config/selectors.json" }
+}

@@ -1,0 +1,10 @@
+node_modules/
+.pnpm-store/
+.runtime/
+logs/*
+!logs/.gitkeep
+input/*
+!input/.gitkeep
+filesback/*
+!filesback/.gitkeep
+*.log

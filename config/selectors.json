@@ -1,0 +1,22 @@
+{
+  "verified": false,
+  "frame": null,
+  "title": null,
+  "period": null,
+  "rows": null,
+  "dateCell": null,
+  "editor": null,
+  "editButton": null,
+  "applyButton": null,
+  "fields": {
+    "pattern": { "read": null, "readMode": "text", "input": null, "control": "select" },
+    "reason": { "read": null, "readMode": "text", "input": null, "control": "select" },
+    "start": { "read": null, "readMode": "text", "input": null, "control": "fill" },
+    "end": { "read": null, "readMode": "text", "input": null, "control": "fill" },
+    "break": { "read": null, "readMode": "text", "input": null, "control": "fill" },
+    "worked": { "read": null, "readMode": "text" }
+  },
+  "saveSuccess": null,
+  "saveSuccessText": null,
+  "timeoutMs": 10000
+}

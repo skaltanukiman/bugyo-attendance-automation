@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja"><meta charset="utf-8"><title>勤務実績テスト専用</title>
+<h1>勤務実績申請</h1><p id="period">令和 8年 9月</p>
+<table><thead><tr><th>日付</th><th>勤務体系</th><th>事由</th><th>出勤</th><th>退出</th><th>休憩</th><th>実働</th></tr></thead><tbody></tbody></table>
+<button id="submit" type="button">申請</button><button id="draft" type="button">下書き保存</button><p id="saved" hidden></p>
+<script>
+window.stats = { applications: 0, drafts: 0, changes: 0 }; window.failSave = false;
+// Shuffled dates intentionally detect accidental index-based row matching.
+for (const day of [11, 3, 2, 1, 4]) {
+ const tr = document.createElement('tr'); tr.dataset.day = day;
+ tr.innerHTML = `<td data-date>9/ ${day} (${day===1?'火':'水'})</td><td><select data-pattern><option value="200">200 エンジニア</option><option value="205">205 エンジニア</option></select></td><td><select data-reason><option value=""></option><option value="007">007 在宅勤務</option><option value="006">006 出社</option><option value="040">040 有休</option></select></td><td><input data-start></td><td><input data-end></td><td><input data-break></td><td data-worked></td>`;
+ tr.addEventListener('change', () => {
+   window.stats.changes++;
+   const start = tr.querySelector('[data-start]').value, end = tr.querySelector('[data-end]').value, rest = tr.querySelector('[data-break]').value;
+   const minutes = t => {const [h,m]=t.split(':').map(Number);return h*60+m};
+   tr.querySelector('[data-worked]').textContent = start && end && rest ? ((minutes(end)-minutes(start))/60-Number(rest)).toFixed(2) : '';
+ });
+ document.querySelector('tbody').append(tr);
+}
+document.querySelector('#submit').onclick = () => window.stats.applications++;
+document.querySelector('#draft').onclick = () => { window.stats.drafts++; if(!window.failSave) setTimeout(()=> { const s=document.querySelector('#saved');s.hidden=false;s.textContent='下書き保存が完了しました'; },30); };
+</script></html>

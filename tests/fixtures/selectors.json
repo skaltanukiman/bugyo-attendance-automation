@@ -1,0 +1,22 @@
+{
+  "verified": true,
+  "frame": null,
+  "title": "h1",
+  "period": "#period",
+  "rows": "tbody tr",
+  "dateCell": "[data-date]",
+  "editor": null,
+  "editButton": null,
+  "applyButton": null,
+  "fields": {
+    "pattern": { "read": "[data-pattern]", "readMode": "value", "input": "[data-pattern]", "control": "select" },
+    "reason": { "read": "[data-reason]", "readMode": "value", "input": "[data-reason]", "control": "select" },
+    "start": { "read": "[data-start]", "readMode": "value", "input": "[data-start]", "control": "fill" },
+    "end": { "read": "[data-end]", "readMode": "value", "input": "[data-end]", "control": "fill" },
+    "break": { "read": "[data-break]", "readMode": "value", "input": "[data-break]", "control": "fill" },
+    "worked": { "read": "[data-worked]", "readMode": "text" }
+  },
+  "saveSuccess": "#saved",
+  "saveSuccessText": "下書き保存が完了しました",
+  "timeoutMs": 800
+}
