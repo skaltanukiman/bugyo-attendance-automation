@@ -18,6 +18,7 @@ export interface AttendancePort {
 }
 export class AttendancePage implements AttendancePort {
   readonly root: Page | FrameLocator;
+  private readonly openedCodeValues = new Map<string, string>();
   constructor(readonly page: Page, readonly selectors: InspectionSelectors, readonly mode: ExecutionMode = 'normal') {
     this.root = selectors.frame ? page.frameLocator(selectors.frame) : page;
     page.setDefaultTimeout(selectors.timeoutMs);
@@ -83,6 +84,14 @@ export class AttendancePage implements AttendancePort {
         const extra = await element.getAttribute(attribute);
         ensure(extra === '', `${key}: 複数事由または未確認の属性状態があるため停止します。`);
       }
+      if ('activate' in f && f.activate && await row.locator(f.input).count() && f.readMode === 'text' && (key === 'pattern' || key === 'reason')) {
+        const input = await unique(row.locator(f.input), '編集中のコード入力欄');
+        const live = normalize(key, await input.inputValue());
+        const baseline = this.openedCodeValues.get(`${day.record.date}:${key}`);
+        ensure(baseline !== undefined && live === baseline, `${key}: 未確定の手入力があります。確定または取消後に再実行してください。`);
+        result[key] = live;
+        continue;
+      }
       if (f.readMode === 'attribute') {
         const value = await element.getAttribute(f.readAttribute!);
         ensure(value !== null, `${key}: 読取属性がありません。`);
@@ -99,6 +108,20 @@ export class AttendancePage implements AttendancePort {
     }
     return normalized(result);
   }
+  private async trackCodeEditor(scope: Locator, day: PlannedDay, key: FieldKey): Promise<void> {
+    if (key !== 'pattern' && key !== 'reason') return;
+    const f = this.selectors.fields[key];
+    if (!f.activate || f.readMode !== 'text') return;
+    const token = `${day.record.date}:${key}`;
+    const input = scope.locator(f.input);
+    if (await input.count()) {
+      const live = normalize(key, await (await unique(input, 'コード入力欄')).inputValue());
+      ensure(this.openedCodeValues.has(token) && live === this.openedCodeValues.get(token), `${key}: 未確定の手入力があります。`);
+    } else {
+      const cell = await unique(scope.locator(f.read), 'コード表示');
+      this.openedCodeValues.set(token, normalize(key, await cell.innerText()));
+    }
+  }
   async write(day: PlannedDay): Promise<void> {
     ensure(this.selectors.verified || this.mode === 'trial', '未確認のセレクタでは入力できません。');
     const row = await this.row(day);
@@ -113,7 +136,10 @@ export class AttendancePage implements AttendancePort {
     const keys = day.kind === 'paid' ? ['pattern', 'reason'] as const : ['pattern', 'reason', 'start', 'end', 'break'] as const;
     for (const key of keys) {
       const f = this.selectors.fields[key];
-      if (f.activate) await safeClick(scope.locator(f.activate));
+      if (f.activate) {
+        await this.trackCodeEditor(scope, day, key);
+        await safeClick(scope.locator(f.activate));
+      }
       await scope.locator(f.input).waitFor({ state: 'visible' });
       const input = await unique(scope.locator(f.input), `${key}入力欄`);
       const value = day.expected[key];
@@ -133,6 +159,7 @@ export class AttendancePage implements AttendancePort {
         }
       }
       if (f.commit) {
+        if (f.commitField) await this.trackCodeEditor(scope, day, f.commitField);
         await safeClick(scope.locator(f.commit));
         await input.waitFor({ state: 'hidden' });
       } else if (f.control !== 'custom') await input.blur();
@@ -192,6 +219,7 @@ export class AttendancePage implements AttendancePort {
     await this.draftButton().waitFor({ state: 'hidden' });
     ensure(await this.root.locator(this.selectors.rows).count() === 0, '保存後も入力画面が残っています。');
     await new DraftListPage(this.root, this.selectors.draftList!).openMonth(period);
+    this.openedCodeValues.clear();
     await this.pageTitle().waitFor({ state: 'visible' });
     await this.draftButton().waitFor({ state: 'visible' });
     await this.assertPeriod(period, async () => false);

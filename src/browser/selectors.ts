@@ -8,6 +8,7 @@ const readable = z.object({ read: selector, readMode: z.enum(['text', 'value', '
 const field = readable.extend({ input: selector,
   control: z.enum(['fill', 'select', 'custom', 'splitTime', 'splitDecimal']), option: selector.optional(), clear: selector.optional(),
   activate: selector.optional(), commit: selector.optional(),
+  commitField: z.enum(['pattern', 'reason']).optional(),
   hour: selector.optional(), minute: selector.optional(), dayType: selector.optional() });
 const selectorsDefinition = z.object({
   verified: z.boolean(),
@@ -34,6 +35,7 @@ function validateSelectors(s: z.infer<typeof selectorsDefinition>, ctx: z.Refine
     const f = s.fields[k];
     if (f.control === 'custom' && (!f.option?.includes('{code}') || !f.clear)) ctx.addIssue({ code: 'custom', message: `${k}: customには{code}付きoptionとclearが必要です。` });
     if (Boolean(f.activate) !== Boolean(f.commit)) ctx.addIssue({ code: 'custom', message: `${k}: セル編集はactivateとcommitを両方設定してください。` });
+    if (f.commitField && (!f.commit || f.commit !== s.fields[f.commitField].activate || !['fill', 'select'].includes(s.fields[f.commitField].control))) ctx.addIssue({ code: 'custom', message: `${k}: 確定先のコード入力欄とセレクタが一致しません。` });
     if (f.control === 'splitTime' || f.control === 'splitDecimal') {
       if (!f.activate || !f.hour || !f.minute || (f.control === 'splitTime' && !f.dayType)) ctx.addIssue({ code: 'custom', message: `${k}: 分割入力のセレクタが不足しています。` });
       if ((f.control === 'splitTime' && k !== 'start' && k !== 'end') || (f.control === 'splitDecimal' && k !== 'break')) ctx.addIssue({ code: 'custom', message: `${k}: 分割入力方式が項目に適合しません。` });

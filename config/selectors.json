@@ -11,17 +11,16 @@
   "fields": {
     "pattern": {
       "read": "td[data-ctype=\"sys\"]",
-      "readMode": "attribute",
-      "readAttribute": "data-code",
+      "readMode": "text",
       "activate": "td[data-ctype=\"sys\"]",
       "input": "td[data-ctype=\"sys\"] input#sys-code",
       "control": "fill",
-      "commit": "td[data-ctype=\"res\"]"
+      "commit": "td[data-ctype=\"res\"]",
+      "commitField": "reason"
     },
     "reason": {
       "read": "td[data-ctype=\"res\"]",
-      "readMode": "attribute",
-      "readAttribute": "data-code1",
+      "readMode": "text",
       "emptyAttributes": [
         "data-code2",
         "data-code3",
@@ -31,7 +30,8 @@
       "activate": "td[data-ctype=\"res\"]",
       "input": "td[data-ctype=\"res\"] input#res-code",
       "control": "fill",
-      "commit": "td[data-ctype=\"sys\"]"
+      "commit": "td[data-ctype=\"sys\"]",
+      "commitField": "pattern"
     },
     "start": {
       "read": "td[data-custom-label=\"出勤時刻\"]",
@@ -42,7 +42,8 @@
       "dayType": "input[data-type=\"type\"]",
       "hour": "input[data-type=\"hour\"]",
       "minute": "input[data-type=\"minute\"]",
-      "commit": "td[data-ctype=\"sys\"]"
+      "commit": "td[data-ctype=\"sys\"]",
+      "commitField": "pattern"
     },
     "end": {
       "read": "td[data-custom-label=\"退出時刻\"]",
@@ -53,7 +54,8 @@
       "dayType": "input[data-type=\"type\"]",
       "hour": "input[data-type=\"hour\"]",
       "minute": "input[data-type=\"minute\"]",
-      "commit": "td[data-ctype=\"sys\"]"
+      "commit": "td[data-ctype=\"sys\"]",
+      "commitField": "pattern"
     },
     "break": {
       "read": "td[data-key$=\"-TimeSpan.17.InputedSpan\"]",
@@ -63,7 +65,8 @@
       "control": "splitDecimal",
       "hour": "input#spanTotalHours",
       "minute": "input#spanMinutes",
-      "commit": "td[data-ctype=\"sys\"]"
+      "commit": "td[data-ctype=\"sys\"]",
+      "commitField": "pattern"
     },
     "worked": {
       "read": "td[data-key$=\"-TimeSpan.20.InputedSpan\"]",

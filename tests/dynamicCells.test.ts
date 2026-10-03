@@ -42,8 +42,8 @@ async function fixture(action: (page: import('playwright').Page, port: Attendanc
             row.dispatchEvent(new Event('commit-edit'));
             const old = cell.textContent!;
             if (key === 'pattern' || key === 'reason') {
-              const value = cell.getAttribute(key === 'pattern' ? 'data-code' : 'data-code1')!;
-              cell.innerHTML = `<input id="${key === 'pattern' ? 'sys-code' : 'res-code'}" value="">`;
+              const value = old.match(/^\d+/)?.[0] ?? '';
+              cell.innerHTML = `<input id="${key === 'pattern' ? 'sys-code' : 'res-code'}" value=""><span>テスト名称</span>`;
               (cell.querySelector('input') as HTMLInputElement).value = value;
             } else if (key === 'break') {
               const [hour = '', fraction = ''] = old.split('.');
@@ -61,7 +61,8 @@ async function fixture(action: (page: import('playwright').Page, port: Attendanc
             if (!cell.querySelector('input')) continue;
             const key = cell.dataset.testfield;
             let text = '';
-            if (key === 'pattern' || key === 'reason') { text = cell.querySelector('input')!.value; cell.setAttribute(key === 'pattern' ? 'data-code' : 'data-code1', text); }
+            // Original data-code attributes deliberately remain unchanged after edits.
+            if (key === 'pattern' || key === 'reason') text = cell.querySelector('input')!.value;
             else if (key === 'break') text = `${cell.querySelector<HTMLInputElement>('#spanTotalHours')!.value}.${cell.querySelector<HTMLInputElement>('#spanMinutes')!.value}`;
             else text = `${String(Number(cell.querySelector<HTMLInputElement>('[data-type="hour"]')!.value) + (cell.querySelector<HTMLInputElement>('[data-type="type"]')!.value === '2' ? 24 : 0)).padStart(2, '0')}:${cell.querySelector<HTMLInputElement>('[data-type="minute"]')!.value}`;
             cell.textContent = text; w.commits++;
@@ -90,12 +91,17 @@ async function fixture(action: (page: import('playwright').Page, port: Attendanc
   } finally { await page.close(); }
 }
 test('分割セルを開いて入力・確定し、左右に分かれた日付行を正しく検証する', async () => fixture(async (page, port) => {
-  await page.locator('[data-testday="1"] [data-ctype="sys"]').click(); // live value differs from HTML value attribute
   assert.equal((await port.read(plan[0])).pattern, '200');
   const state = initialState();
   await enterAndSave(port, period, plan, '007', state, () => {}, async () => false);
   assert.equal(state.saved, true);
   assert.equal((await port.read(plan[0])).break, '1.50');
+  assert.equal((await port.read(plan[0])).pattern, '205');
+  assert.equal((await port.read(plan[0])).reason, '007');
+  assert.equal(await page.locator('[data-testday="1"] [data-ctype="sys"]').getAttribute('data-code'), '200');
+  assert.equal(await page.locator('[data-testday="1"] [data-ctype="res"]').getAttribute('data-code1'), '');
+  assert.equal(await page.locator('[data-testday="1"] input#sys-code').inputValue(), '205');
+  assert.equal(await page.locator('[data-testday="1"] input#sys-code').getAttribute('value'), '');
   assert.equal(await page.locator('[data-testday="2"] [data-ctype="sys"]').getAttribute('data-code'), '200');
   assert.deepEqual(await page.evaluate(() => ({ applied: (window as any).applied, saved: (window as any).saved })), { applied: 0, saved: 1 });
   assert.ok(await page.evaluate(() => (window as any).commits > 0));
@@ -161,4 +167,19 @@ test('年月の取得元が不十分または日付表示と矛盾する場合�
   await assert.rejects(() => port.assertPeriod(period, async () => true), /表示と属性/);
   assert.equal(selectorsSchema.safeParse({ ...selectors, period: null, periodSource: 'display' }).success, false);
   assert.equal(selectorsSchema.safeParse({ ...selectors, periodSource: 'rowDates', dateEvidence: undefined }).success, false);
+}));
+test('自動処理が開いたコード欄でも開く前の値から変更されれば停止する', async () => fixture(async (page, port) => {
+  await port.write(plan[0]);
+  await page.locator('[data-testday="1"] input#sys-code').fill('999');
+  await assert.rejects(() => port.read(plan[0]), /未確定/);
+  await assert.rejects(() => port.verify(plan[0]), /未確定/);
+  assert.equal(await page.evaluate(() => (window as any).saved), 0);
+  assert.equal(await page.evaluate(() => (window as any).applied), 0);
+}));
+test('自動処理以外で開かれたコード欄は同値でも確定済みと扱わない', async () => fixture(async (page, port) => {
+  await page.locator('[data-testday="1"] [data-ctype="sys"]').click();
+  assert.equal(await page.locator('[data-testday="1"] input#sys-code').inputValue(), '200');
+  await assert.rejects(() => enterAndSave(port, period, plan, '007', initialState(), () => {}, async () => false), /未確定/);
+  assert.equal(await page.evaluate(() => (window as any).saved), 0);
+  assert.equal(await page.evaluate(() => (window as any).commits), 0);
 }));
