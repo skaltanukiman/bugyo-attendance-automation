@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { Browser } from 'playwright';
 import { loadSettings } from './domain/config.js';
 import { ensure, UserError } from './domain/attendance.js';
+import { executionMode } from './domain/executionMode.js';
 import { readWorkbook } from './excel/reader.js';
 import { parseWorkbook } from './excel/parser.js';
 import { parseDays, periodFromFilename } from './utils/date.js';
@@ -14,7 +15,7 @@ import { summary, leaveWarning } from './cli/summary.js';
 import { buildPlan } from './services/validationService.js';
 import { enterAndSave, initialState } from './services/attendanceService.js';
 import { backupFile, fingerprint } from './services/backupService.js';
-import { selectorsSchema } from './browser/selectors.js';
+import { selectorsForRun } from './browser/selectors.js';
 import { AttendancePage } from './browser/attendancePage.js';
 import { launchEdge, connectEdge, disconnect } from './browser/edgeLauncher.js';
 
@@ -26,10 +27,12 @@ export async function main(): Promise<void> {
   let locked = false, edgeLaunched = false, paidUnset = false, paidCode = '', file = '';
   const lockPath = resolve('.runtime/run.lock');
   try {
+    const mode = executionMode(process.argv.slice(2));
     await mkdir('.runtime', { recursive: true });
     try { const lock = await open(lockPath, 'wx'); await lock.writeFile(String(process.pid)); await lock.close(); locked = true; }
     catch { throw new UserError('別の処理が実行中、または前回のロックが残っています。.runtime/run.lockを確認してください。'); }
     log = createLogger('logs');
+    if (mode === 'trial') log('通しテスト: 未確認の設定で実画面への入力・検証・下書き保存・再読取・Excel退避を実行します。最終申請は行いません。');
     state.stage = '設定読み込み';
     const settings = await loadSettings('config/settings.json');
     prompt = new Prompt();
@@ -56,10 +59,9 @@ export async function main(): Promise<void> {
     for (const r of records.filter(r => !r.hasWork && !paid.includes(r.day))) log(`${r.date} 非対象 SKIP（休暇種別は判定しません）`);
     if (paidUnset) log(leaveWarning(paidCode));
     ensure(plan.length > 0, '入力対象日がありません。');
-    if (!await prompt.confirm('この内容でブラウザを起動しますか？', true)) { log('キャンセルしました。画面とExcelは変更していません。'); return; }
+    if (!await prompt.confirm(mode === 'trial' ? 'この内容で下書き保存までの通しテストを開始しますか？' : 'この内容でブラウザを起動しますか？', true)) { log('キャンセルしました。画面とExcelは変更していません。'); return; }
     state.stage = 'セレクタ設定確認';
-    const parsed = selectorsSchema.safeParse(JSON.parse(await readFile(settings.browser.selectorsFile, 'utf8')));
-    ensure(parsed.success, '実DOMのセレクタが未設定です。docs/selectors.mdに従い設定してください。入力は開始していません。');
+    const selectors = selectorsForRun(JSON.parse(await readFile(settings.browser.selectorsFile, 'utf8')), mode);
     state.stage = 'Edge起動';
     await launchEdge(settings.browser); edgeLaunched = true;
     await prompt.question('Microsoft Edgeを起動しました。\n1. 手動で奉行クラウドへログインしてください。\n2. 「勤務実績申請」画面で対象月を表示してください。\n準備が完了したら、このコンソールへ戻りEnterを押してください。');
@@ -67,7 +69,7 @@ export async function main(): Promise<void> {
     browser = await connectEdge(settings.browser.remoteDebuggingPort);
     const candidates: AttendancePage[] = [];
     for (const context of browser.contexts()) for (const tab of context.pages()) {
-      const page = new AttendancePage(tab, parsed.data);
+      const page = new AttendancePage(tab, selectors, mode);
       if (await page.matches()) candidates.push(page);
     }
     ensure(candidates.length === 1, '勤務実績申請画面を一意に特定できません。対象タブを1つだけ開いてください。');
@@ -87,7 +89,7 @@ export async function main(): Promise<void> {
       process.exitCode = 2;
     }
     log(summary(file, period, plan, settings.attendance));
-    log('勤務実績入力・検証・下書き保存が完了しました。ブラウザを確認し、問題がなければ利用者自身が「申請」してください。');
+    log(mode === 'trial' ? '通しテストの入力・検証・下書き保存・保存内容の再確認が完了しました。下書きの状態で終了します。verified設定は変更していません。' : '勤務実績入力・検証・下書き保存が完了しました。ブラウザを確認し、問題がなければ利用者自身が「申請」してください。');
   } catch (error) {
     process.exitCode = 1;
     const detail = error instanceof UserError ? error.message : '処理に失敗しました。設定・ファイル・画面状態を確認してください（認証情報保護のため生のエラーは記録しません）。';

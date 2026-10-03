@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { Fields } from '../domain/attendance.js';
+import { ensure } from '../domain/attendance.js';
+import type { ExecutionMode } from '../domain/executionMode.js';
 const selector = z.string().min(1);
 const readable = z.object({ read: selector, readMode: z.enum(['text', 'value', 'attribute']),
   readAttribute: selector.optional(), emptyAttributes: z.array(selector).optional() });
@@ -7,8 +9,8 @@ const field = readable.extend({ input: selector,
   control: z.enum(['fill', 'select', 'custom', 'splitTime', 'splitDecimal']), option: selector.optional(), clear: selector.optional(),
   activate: selector.optional(), commit: selector.optional(),
   hour: selector.optional(), minute: selector.optional(), dayType: selector.optional() });
-export const selectorsSchema = z.object({
-  verified: z.literal(true),
+const selectorsDefinition = z.object({
+  verified: z.boolean(),
   frame: selector.nullable(),
   title: selector, period: selector.nullable(), rows: selector, dateCell: selector,
   periodSource: z.enum(['display', 'rowDates']).optional(),
@@ -21,7 +23,8 @@ export const selectorsSchema = z.object({
   draftList: z.object({ entry: selector, title: selector, loaded: selector, rows: selector,
     status: selector, name: selector, period: selector, open: selector, openEditor: selector }).nullable().optional(),
   timeoutMs: z.number().int().min(100).max(120000)
-}).superRefine((s, ctx) => {
+});
+function validateSelectors(s: z.infer<typeof selectorsDefinition>, ctx: z.RefinementCtx) {
   const saveConfigured = s.saveMode === 'reopenDraft' ? s.returnMarker && s.draftList
     : s.saveMode === 'countAndReturn' ? s.draftCount && s.returnMarker : s.saveSuccess && s.saveSuccessText;
   if (!saveConfigured) ctx.addIssue({ code: 'custom', message: '保存成功の確認方法を設定してください。' });
@@ -37,7 +40,15 @@ export const selectorsSchema = z.object({
     }
   }
   for (const [k, f] of Object.entries(s.fields)) if (f.readMode === 'attribute' && !f.readAttribute) ctx.addIssue({ code: 'custom', message: `${k}: readAttributeが必要です。` });
-});
+}
+export const selectorsSchema = selectorsDefinition.extend({ verified: z.literal(true) }).superRefine(validateSelectors);
+export const inspectionSelectorsSchema = selectorsDefinition.superRefine(validateSelectors);
+export function selectorsForRun(raw: unknown, mode: ExecutionMode): InspectionSelectors {
+  const parsed = (mode === 'trial' ? inspectionSelectorsSchema : selectorsSchema).safeParse(raw);
+  ensure(parsed.success, '実DOMのセレクタが未設定、未確認、または設定が不正です。入力は開始していません。');
+  return parsed.data;
+}
 export type Selectors = z.infer<typeof selectorsSchema>;
+export type InspectionSelectors = z.infer<typeof inspectionSelectorsSchema>;
 export type FieldKey = keyof Fields;
 export type EditableField = Selectors['fields']['start'];

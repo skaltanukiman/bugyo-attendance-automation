@@ -1,8 +1,9 @@
 import type { Page, FrameLocator, Locator } from 'playwright';
 import { ensure, type Fields, type Period, type PlannedDay } from '../domain/attendance.js';
+import type { ExecutionMode } from '../domain/executionMode.js';
 import { daysInMonth, parseScreenPeriod } from '../utils/date.js';
 import { equals, normalize, normalized } from '../services/validationService.js';
-import type { Selectors, FieldKey } from './selectors.js';
+import type { InspectionSelectors, FieldKey } from './selectors.js';
 import { timeParts, decimalParts } from './splitInput.js';
 import { safeClick, unique } from './interactions.js';
 import { DraftListPage } from './draftListPage.js';
@@ -17,7 +18,7 @@ export interface AttendancePort {
 }
 export class AttendancePage implements AttendancePort {
   readonly root: Page | FrameLocator;
-  constructor(readonly page: Page, readonly selectors: Selectors) {
+  constructor(readonly page: Page, readonly selectors: InspectionSelectors, readonly mode: ExecutionMode = 'normal') {
     this.root = selectors.frame ? page.frameLocator(selectors.frame) : page;
     page.setDefaultTimeout(selectors.timeoutMs);
   }
@@ -94,6 +95,7 @@ export class AttendancePage implements AttendancePort {
     return normalized(result);
   }
   async write(day: PlannedDay): Promise<void> {
+    ensure(this.selectors.verified || this.mode === 'trial', '未確認のセレクタでは入力できません。');
     const row = await this.row(day);
     let scope: Locator = row;
     if (this.selectors.editButton) {
@@ -145,6 +147,7 @@ export class AttendancePage implements AttendancePort {
     ensure(false, `${day.record.date}: 入力後の値が期待値と一致しません。下書き保存しません。`);
   }
   async saveDraft(period?: Period, plan?: PlannedDay[]): Promise<void> {
+    ensure(this.selectors.verified || this.mode === 'trial', '未確認のセレクタでは下書き保存できません。');
     if (this.selectors.saveMode === 'reopenDraft') {
       ensure(period && plan?.length, '下書き再読取には対象年月と入力予定が必要です。');
       await this.saveAndReopen(period, plan);
