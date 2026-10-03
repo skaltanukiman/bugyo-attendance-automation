@@ -107,3 +107,49 @@ test('行の編集ダイアログ方式もセレクタ差し替えで入力で�
   await enterAndSave(port, period, buildPlan([record(1)], [], [], codes), '007', state, () => {}, async () => true);
   assert.equal(state.saved, true); assert.equal((await stats(page)).applications, 0);
 }));
+const countSelectors = selectorsSchema.parse({ ...selectors, saveMode: 'countAndReturn', saveSuccess: null, saveSuccessText: null,
+  draftCount: 'text=/^下書き\\s*[:：]\\s*[0-9]+\\s*件$/', returnMarker: 'text="申請期間"', timeoutMs: 400 });
+async function countFixture(page: Page, before: number, after: number, mode = 'return') {
+  await page.evaluate(({ before, after, mode }) => {
+    const badge = document.createElement('div'); badge.id = 'draft-count'; badge.textContent = `下書き:${before}件`; document.body.prepend(badge);
+    (document.querySelector('#draft') as HTMLButtonElement).onclick = () => {
+      (window as any).stats.drafts++;
+      if (mode !== 'stay') document.body.innerHTML = '';
+      if (mode !== 'stay') { const count = document.createElement('div'); count.id = 'draft-count'; document.body.append(count); }
+      document.querySelector('#draft-count')!.textContent = `下書き:${after}件`;
+      if (mode !== 'missingMarker') { const label = document.createElement('p'); label.textContent = '申請期間'; document.body.append(label); }
+    };
+  }, { before, after, mode });
+}
+test('新しい下書き件数と入力画面からの遷移を両方確認して保存成功とする', async () => {
+  for (const before of [0, 3]) await fixture(async page => {
+    await countFixture(page, before, before + 1);
+    await new AttendancePage(page, countSelectors).saveDraft();
+    assert.equal((await stats(page)).drafts, 1); assert.equal((await stats(page)).applications, 0);
+  });
+});
+test('件数不変・想定外増加・遷移未確認では成功にせず再クリックもしない', async () => {
+  for (const [after, mode] of [[1, 'return'], [3, 'return'], [2, 'missingMarker'], [2, 'stay']] as const) await fixture(async page => {
+    await countFixture(page, 1, after, mode);
+    await assert.rejects(() => new AttendancePage(page, countSelectors).saveDraft(), /1件増加/);
+    assert.equal((await stats(page)).drafts, 1); assert.equal((await stats(page)).applications, 0);
+  });
+});
+test('保存前に件数が取得できなければ保存ボタンを押さない', async () => fixture(async page => {
+  await assert.rejects(() => new AttendancePage(page, countSelectors).saveDraft(), /下書き件数/);
+  assert.equal((await stats(page)).drafts, 0);
+}));
+test('ページ全体の遷移後にも下書き件数を読み直して保存を確認する', async () => fixture(async page => {
+  let requests = 0;
+  await page.route('http://127.0.0.1:18765/result', async route => {
+    requests++;
+    await route.fulfill({ contentType: 'text/html; charset=utf-8', body: '<meta charset="utf-8"><p>下書き:1件</p><label>申請期間</label>' });
+  });
+  await countFixture(page, 0, 1);
+  await page.evaluate(() => {
+    (document.querySelector('#draft') as HTMLButtonElement).onclick = () => { location.href = 'http://127.0.0.1:18765/result'; };
+  });
+  await new AttendancePage(page, { ...countSelectors, timeoutMs: 2000 }).saveDraft();
+  assert.equal(requests, 1);
+  assert.equal(page.url(), 'http://127.0.0.1:18765/result');
+}));

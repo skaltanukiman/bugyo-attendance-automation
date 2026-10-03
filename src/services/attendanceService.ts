@@ -46,5 +46,5 @@ export async function enterAndSave(page: AttendancePort, period: Period, plan: P
   state.saveAttempted = true;
   await page.saveDraft();
   state.saved = true;
-  log('下書き保存の完了表示を確認しました。');
+  log('下書き保存の成功条件を確認しました。');
 }

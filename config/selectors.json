@@ -1,22 +1,84 @@
 {
   "verified": false,
   "frame": null,
-  "title": null,
+  "title": "text=\"勤務実績申請\"",
   "period": null,
-  "rows": null,
-  "dateCell": null,
+  "rows": "tr.js-cm-scrTbl__innerTr",
+  "dateCell": "td.js-inputTableDate",
   "editor": null,
   "editButton": null,
   "applyButton": null,
   "fields": {
-    "pattern": { "read": null, "readMode": "text", "input": null, "control": "select" },
-    "reason": { "read": null, "readMode": "text", "input": null, "control": "select" },
-    "start": { "read": null, "readMode": "text", "input": null, "control": "fill" },
-    "end": { "read": null, "readMode": "text", "input": null, "control": "fill" },
-    "break": { "read": null, "readMode": "text", "input": null, "control": "fill" },
-    "worked": { "read": null, "readMode": "text" }
+    "pattern": {
+      "read": "td[data-ctype=\"sys\"]",
+      "readMode": "attribute",
+      "readAttribute": "data-code",
+      "activate": "td[data-ctype=\"sys\"]",
+      "input": "td[data-ctype=\"sys\"] input#sys-code",
+      "control": "fill",
+      "commit": "td[data-ctype=\"res\"]"
+    },
+    "reason": {
+      "read": "td[data-ctype=\"res\"]",
+      "readMode": "attribute",
+      "readAttribute": "data-code1",
+      "emptyAttributes": [
+        "data-code2",
+        "data-code3",
+        "data-code4",
+        "data-code5"
+      ],
+      "activate": "td[data-ctype=\"res\"]",
+      "input": "td[data-ctype=\"res\"] input#res-code",
+      "control": "fill",
+      "commit": "td[data-ctype=\"sys\"]"
+    },
+    "start": {
+      "read": "td[data-custom-label=\"出勤時刻\"]",
+      "readMode": "text",
+      "activate": "td[data-custom-label=\"出勤時刻\"]",
+      "input": "td[data-custom-label=\"出勤時刻\"] #time",
+      "control": "splitTime",
+      "dayType": "input[data-type=\"type\"]",
+      "hour": "input[data-type=\"hour\"]",
+      "minute": "input[data-type=\"minute\"]",
+      "commit": "td[data-ctype=\"sys\"]"
+    },
+    "end": {
+      "read": "td[data-custom-label=\"退出時刻\"]",
+      "readMode": "text",
+      "activate": "td[data-custom-label=\"退出時刻\"]",
+      "input": "td[data-custom-label=\"退出時刻\"] #time",
+      "control": "splitTime",
+      "dayType": "input[data-type=\"type\"]",
+      "hour": "input[data-type=\"hour\"]",
+      "minute": "input[data-type=\"minute\"]",
+      "commit": "td[data-ctype=\"sys\"]"
+    },
+    "break": {
+      "read": "td[data-key$=\"-TimeSpan.17.InputedSpan\"]",
+      "readMode": "text",
+      "activate": "td[data-key$=\"-TimeSpan.17.InputedSpan\"]",
+      "input": "td[data-key$=\"-TimeSpan.17.InputedSpan\"] #spanBox-span",
+      "control": "splitDecimal",
+      "hour": "input#spanTotalHours",
+      "minute": "input#spanMinutes",
+      "commit": "td[data-ctype=\"sys\"]"
+    },
+    "worked": {
+      "read": "td[data-key$=\"-TimeSpan.20.InputedSpan\"]",
+      "readMode": "text"
+    }
   },
   "saveSuccess": null,
   "saveSuccessText": null,
-  "timeoutMs": 10000
+  "timeoutMs": 10000,
+  "dateEvidence": {
+    "selector": "input[data-labordate]",
+    "attribute": "data-labordate"
+  },
+  "periodSource": "rowDates",
+  "saveMode": "countAndReturn",
+  "draftCount": "text=/^下書き\\s*[:：]\\s*[0-9]+\\s*件$/",
+  "returnMarker": "text=\"申請期間\""
 }
