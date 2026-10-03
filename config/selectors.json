@@ -78,7 +78,18 @@
     "attribute": "data-labordate"
   },
   "periodSource": "rowDates",
-  "saveMode": "countAndReturn",
+  "saveMode": "reopenDraft",
   "draftCount": "text=/^下書き\\s*[:：]\\s*[0-9]+\\s*件$/",
-  "returnMarker": "text=\"申請期間\""
+  "returnMarker": "text=\"申請期間\"",
+  "draftList": {
+    "entry": "text=/^下書き\\s*[:：]\\s*[0-9]+\\s*件$/",
+    "title": "text=\"申請状況\"",
+    "loaded": "text=\"すべてのデータを取得しました。\"",
+    "rows": "tr.js-tm-tableRow.js-cm-scrTbl__innerTr",
+    "status": "td[data-columnindex=\"0\"] .js-cm-statusLabel_text",
+    "name": "td[data-columnindex=\"1\"] a.js-tm-showItem",
+    "period": "td[data-columnindex=\"2\"]",
+    "open": "td[data-columnindex=\"1\"] a.js-tm-showItem",
+    "openEditor": "button.js-edit[data-actionlog-actiontype=\"申請書入力\"][type=\"button\"]"
+  }
 }

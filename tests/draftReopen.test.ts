@@ -1,0 +1,96 @@
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { chromium, type Browser, type Page } from 'playwright';
+import { selectorsSchema } from '../src/browser/selectors.js';
+import { AttendancePage } from '../src/browser/attendancePage.js';
+import { buildPlan } from '../src/services/validationService.js';
+import { enterAndSave, initialState } from '../src/services/attendanceService.js';
+import { isWholeMonthRange } from '../src/utils/date.js';
+import { safeClick } from '../src/browser/interactions.js';
+import { codes } from './helpers.js';
+const html = await readFile(new URL('./fixtures/draftReopen.html', import.meta.url), 'utf8');
+const base = JSON.parse(await readFile(new URL('./fixtures/selectors.json', import.meta.url), 'utf8'));
+const live = JSON.parse(await readFile(new URL('../config/selectors.json', import.meta.url), 'utf8'));
+base.fields.pattern.control = 'fill'; base.fields.reason.control = 'fill';
+const config = selectorsSchema.parse({ ...base, rows: '#attendance tbody tr', saveMode: 'reopenDraft', saveSuccess: null, saveSuccessText: null,
+  returnMarker: 'text="申請期間"', timeoutMs: 500,
+  draftList: { ...live.draftList, entry: '.count', title: 'h1', loaded: '#loaded' }
+});
+const period = { year: 2032, month: 2 };
+const plan = buildPlan([{ date: '2032-02-01', day: 1, hasWork: true, startTime: '10:15', endTime: '18:45', breakHours: 1.5, workedHours: 7 }], [], [], codes);
+let browser: Browser;
+before(async () => { browser = await chromium.launch({ channel: 'msedge', headless: true }); });
+after(async () => { await browser?.close(); });
+async function fixture(mode: string, action: (page: Page, port: AttendancePage) => Promise<void>) {
+  const page = await browser.newPage();
+  try {
+    await page.setContent(html);
+    await page.evaluate(mode => (window as any).testMode = mode, mode);
+    await action(page, new AttendancePage(page, config));
+  } finally { await page.close(); }
+}
+test('新規・既存下書きとも、対象期間の保存内容を再読取して成功にする', async () => {
+  for (const mode of ['existing','new']) await fixture(mode, async (page, port) => {
+    const state = initialState();
+    await enterAndSave(port, period, plan, '007', state, () => {}, async () => false);
+    assert.equal(state.saved, true);
+    assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+    assert.equal((await port.read(plan[0])).break, '1.50');
+  });
+});
+test('件数があるだけで成功にせず、古い保存値なら退避条件を満たさない', async () => fixture('stale', async (page, port) => {
+  const state = initialState();
+  await assert.rejects(() => enterAndSave(port, period, plan, '007', state, () => {}, async () => false), /期待値/);
+  assert.equal(state.saved, false); assert.equal(state.backedUp, false);
+  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+}));
+test('対象期間の重複・別月・承認待ち・部分期間を開かず停止する', async () => {
+  for (const mode of ['duplicate','wrongMonth','approvedOnly','partial']) await fixture(mode, async (page, port) => {
+    const state = initialState();
+    await assert.rejects(() => enterAndSave(port, period, plan, '007', state, () => {}, async () => false), /一意/);
+    assert.equal(state.saved, false);
+    assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 0, opened: 0, deleted: 0 });
+  });
+});
+test('保存後に遷移しなければ保存を繰り返さない', async () => fixture('noReturn', async (page, port) => {
+  const state = initialState();
+  await assert.rejects(() => enterAndSave(port, period, plan, '007', state, () => {}, async () => false));
+  assert.equal(state.saved, false);
+  assert.equal(await page.evaluate(() => (window as any).stats.saves), 1);
+}));
+test('下書きの申請期間は和暦・西暦の開始日と終了日を全月で照合する', () => {
+  assert.equal(isWholeMonthRange('【申請期間】令和14年2月1日(日) ～ 令和14年2月29日(日)', period), true);
+  assert.equal(isWholeMonthRange('2032年2月1日 ～ 2032年2月29日', period), true);
+  for (const range of ['令和13年2月1日 ～ 令和13年2月28日', '令和14年2月1日 ～ 令和14年2月28日', '令和14年2月29日 ～ 令和14年2月1日', '2032年2月1日 ～ 2032年3月1日', '2/1～2/29']) assert.equal(isWholeMonthRange(range, period), false);
+});
+test('詳細表示失敗・入力ボタンの重複では再保存・申請・削除をしない', async () => {
+  for (const mode of ['noDetails', 'duplicateEditor']) await fixture(mode, async (page, port) => {
+    const state = initialState();
+    await assert.rejects(() => enterAndSave(port, period, plan, '007', state, () => {}, async () => false));
+    assert.equal(state.saved, false);
+    assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 0, deleted: 0 });
+  });
+});
+test('申請書入力後の年月が違えば保存確認済みにしない', async () => fixture('wrongEditor', async (page, port) => {
+  const state = initialState();
+  await assert.rejects(() => enterAndSave(port, period, plan, '007', state, () => {}, async () => false), /対象年月/);
+  assert.equal(state.saved, false);
+  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+}));
+test('確認操作の例外でも申請・削除・送信ボタンと誤ったリンクを拒否する', async () => fixture('existing', async (page) => {
+  await page.evaluate(() => { (window as any).list(); (window as any).details(); });
+  for (const action of ['draftDetails', 'draftEditor'] as const) {
+    for (const selector of ['#deleteDraft', '#detailSubmit']) await assert.rejects(() => safeClick(page.locator(selector), action));
+  }
+  const link = page.locator('a.js-tm-showItem').first();
+  await assert.rejects(() => safeClick(link)); // Generic clicks keep rejecting the application name.
+  await link.evaluate(el => el.setAttribute('href', '/submit'));
+  await assert.rejects(() => safeClick(link, 'draftDetails'));
+  const button = page.locator('#openEditor');
+  await button.evaluate(el => el.setAttribute('type', 'submit'));
+  await assert.rejects(() => safeClick(button, 'draftEditor'));
+  await button.evaluate(el => { el.setAttribute('type', 'button'); el.setAttribute('aria-label', '申請'); });
+  await assert.rejects(() => safeClick(button, 'draftEditor'));
+  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 0, applications: 0, viewed: 0, opened: 0, deleted: 0 });
+}));

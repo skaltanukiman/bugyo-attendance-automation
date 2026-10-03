@@ -1,0 +1,56 @@
+<!doctype html><meta charset="utf-8"><title>下書き再読取テスト</title>
+<script>
+// Fictional test data and markup only. This is not captured site HTML.
+window.testMode = 'existing';
+window.stats = { saves: 0, applications: 0, viewed: 0, opened: 0, deleted: 0 };
+window.persisted = { pattern: '200', reason: '', start: '', end: '', break: '', worked: '' };
+function editor(data) {
+ document.body.innerHTML = `<h1>勤務実績申請</h1><p id="period">2032年2月</p>
+ <p class="count">下書き:1件</p><table id="attendance"><tbody><tr data-attendance>
+ <td data-date>2/1 (日)</td><td><input data-pattern value="${data.pattern}"></td><td><input data-reason value="${data.reason}"></td>
+ <td><input data-start value="${data.start}"></td><td><input data-end value="${data.end}"></td><td><input data-break value="${data.break}"></td><td data-worked>${data.worked}</td>
+ </tr></tbody></table><button type="button" id="save">下書き保存</button><button type="button" id="submit">申請</button>`;
+ document.querySelector('#submit').onclick = () => window.stats.applications++;
+ if(window.testMode === 'wrongEditor' && window.stats.opened) document.querySelector('#period').textContent='2032年3月';
+ document.querySelector('#save').onclick = () => {
+   window.stats.saves++;
+   if(window.testMode === 'noReturn') return;
+   if(window.testMode !== 'stale') {
+     window.persisted = {};
+     for(const key of ['pattern','reason','start','end','break']) window.persisted[key] = document.querySelector(`[data-${key}]`).value;
+     window.persisted.worked = document.querySelector('[data-worked]').textContent;
+   }
+   document.body.innerHTML = `<h1>勤務実績申請</h1><label>申請期間</label><button type="button" class="count">下書き:${window.testMode==='new' ? 2 : 1}件</button>`;
+   document.querySelector('.count').onclick = list;
+ };
+}
+function list() {
+ document.body.innerHTML = '<h1>申請状況</h1><table id="list"><tbody></tbody></table><p id="loaded">すべてのデータを取得しました。</p>';
+ const records = [
+   { status: '下書き', month: 1 },
+   { status: '承認待ち', month: 2 },
+   { status: window.testMode==='approvedOnly' ? '承認待ち' : '下書き', month: window.testMode==='wrongMonth' ? 3 : 2 }
+ ];
+ if(window.testMode==='duplicate') records.push({status:'下書き',month:2});
+ for(const record of records) {
+   const row=document.createElement('tr');
+   const last = record.month===2 ? (window.testMode==='partial' ? 28 : 29) : 31;
+   row.className='js-tm-tableRow js-cm-scrTbl__innerTr';
+   row.innerHTML=`<td><table><tbody><tr><td data-columnindex="0"><label><span class="js-cm-statusLabel_text">${record.status}</span></label></td><td data-columnindex="1"><a href="" class="js-tm-showItem" title="勤務実績申請">勤務実績申請</a></td></tr></tbody></table></td>
+   <td><table><tbody><tr><td data-columnindex="2">【申請期間】<br>令和14年${record.month}月1日(日) ～ 令和14年${record.month}月${last}日(日)</td></tr></tbody></table></td>`;
+   row.querySelector('a').onclick=function(event) {event.preventDefault();window.stats.viewed++;details();};
+   document.querySelector('#list tbody').append(row);
+ }
+}
+function details() {
+ if(window.testMode==='noDetails') return;
+ const panel=document.createElement('section'); panel.id='details';
+ panel.innerHTML='<h2>勤務実績申請</h2><button id="openEditor" class="js-edit" data-actionlog-actiontype="申請書入力" type="button">申請書入力</button><button id="deleteDraft" type="button">削除</button><button id="detailSubmit" type="button">申請</button>';
+ if(window.testMode==='duplicateEditor') panel.append(panel.querySelector('#openEditor').cloneNode(true));
+ panel.querySelector('#openEditor').onclick=function() {window.stats.opened++;editor(window.persisted);};
+ panel.querySelector('#deleteDraft').onclick=function() {window.stats.deleted++;};
+ panel.querySelector('#detailSubmit').onclick=function() {window.stats.applications++;};
+ document.body.append(panel);
+}
+document.addEventListener('DOMContentLoaded', () => editor({pattern:'205',reason:'007',start:'10:15',end:'18:45',break:'1.50',worked:'7.00'}));
+</script><body></body>

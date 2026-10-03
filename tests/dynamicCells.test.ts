@@ -11,7 +11,7 @@ import { codes } from './helpers.js';
 
 // Generated fictional records; no captured HTML or real row keys are included.
 const settings = JSON.parse(await readFile(new URL('../config/selectors.json', import.meta.url), 'utf8'));
-const selectors = selectorsSchema.parse({ ...settings, verified: true, title: 'h1', periodSource: 'display', period: '#period', saveMode: 'message', saveSuccess: '#saved', saveSuccessText: 'テスト下書き完了', timeoutMs: 1000 });
+const selectors = selectorsSchema.parse({ ...settings, verified: true, title: 'h1', periodSource: 'display', period: '#period', saveMode: 'message', draftList: null, saveSuccess: '#saved', saveSuccessText: 'テスト下書き完了', timeoutMs: 1000 });
 const period = { year: 2032, month: 2 };
 const plan = buildPlan([{ date: '2032-02-01', day: 1, hasWork: true, startTime: '10:15', endTime: '18:45', breakHours: 1.5, workedHours: 7 }], [], [], codes);
 let browser: Browser;

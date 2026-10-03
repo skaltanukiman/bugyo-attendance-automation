@@ -44,7 +44,7 @@ export async function enterAndSave(page: AttendancePort, period: Period, plan: P
   state.verified = true;
   state.stage = '下書き保存・成功確認';
   state.saveAttempted = true;
-  await page.saveDraft();
+  await page.saveDraft(period, plan);
   state.saved = true;
   log('下書き保存の成功条件を確認しました。');
 }

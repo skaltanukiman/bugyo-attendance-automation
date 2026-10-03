@@ -4,30 +4,16 @@ import { daysInMonth, parseScreenPeriod } from '../utils/date.js';
 import { equals, normalize, normalized } from '../services/validationService.js';
 import type { Selectors, FieldKey } from './selectors.js';
 import { timeParts, decimalParts } from './splitInput.js';
+import { safeClick, unique } from './interactions.js';
+import { DraftListPage } from './draftListPage.js';
+export { safeClick } from './interactions.js';
 
 export interface AttendancePort {
   assertPeriod(period: Period, confirmYear: () => Promise<boolean>): Promise<void>;
   read(day: PlannedDay): Promise<Fields>;
   write(day: PlannedDay): Promise<void>;
   verify(day: PlannedDay): Promise<Fields>;
-  saveDraft(): Promise<void>;
-}
-async function unique(locator: Locator, label: string): Promise<Locator> {
-  ensure(await locator.count() === 1 && await locator.isVisible(), `${label}: 要素がない、複数ある、または非表示です。`);
-  return locator;
-}
-// Every click passes this guard. No submit/final-application API exists.
-export async function safeClick(locator: Locator, draft = false): Promise<void> {
-  await unique(locator, '操作対象');
-  const names = await Promise.all([locator.getAttribute('aria-label'), locator.getAttribute('title'), locator.getAttribute('value'), locator.textContent()]);
-  ensure(!names.some(n => n?.includes('申請')), '申請操作は禁止されています。');
-  if (draft) {
-    ensure(names.some(n => n?.trim() === '下書き保存'), '下書き保存ボタンの名称が一致しません。');
-  } else {
-    const submits = await locator.evaluate(el => (el instanceof HTMLButtonElement || el instanceof HTMLInputElement) && el.type === 'submit');
-    ensure(!submits, '行編集にsubmitボタンは使用できません。');
-  }
-  await locator.click();
+  saveDraft(period?: Period, plan?: PlannedDay[]): Promise<void>;
 }
 export class AttendancePage implements AttendancePort {
   readonly root: Page | FrameLocator;
@@ -158,7 +144,12 @@ export class AttendancePage implements AttendancePort {
     } while (Date.now() < deadline);
     ensure(false, `${day.record.date}: 入力後の値が期待値と一致しません。下書き保存しません。`);
   }
-  async saveDraft(): Promise<void> {
+  async saveDraft(period?: Period, plan?: PlannedDay[]): Promise<void> {
+    if (this.selectors.saveMode === 'reopenDraft') {
+      ensure(period && plan?.length, '下書き再読取には対象年月と入力予定が必要です。');
+      await this.saveAndReopen(period, plan);
+      return;
+    }
     if (this.selectors.saveMode === 'countAndReturn') {
       await this.saveDraftWithCount();
       return;
@@ -183,6 +174,21 @@ export class AttendancePage implements AttendancePort {
     const match = /^下書き\s*[:：]\s*(\d+)\s*件$/.exec(text);
     ensure(match && Number.isSafeInteger(Number(match[1])), '下書き件数を読み取れません。');
     return Number(match[1]);
+  }
+  private async saveAndReopen(period: Period, plan: PlannedDay[]): Promise<void> {
+    const marker = this.root.locator(this.selectors.returnMarker!);
+    ensure(await marker.count() === 0 || !(await marker.isVisible()), '既に保存後の画面が表示されています。');
+    await safeClick(this.draftButton(), true);
+    await marker.waitFor({ state: 'visible' });
+    await unique(marker, '保存後画面の目印');
+    await this.draftButton().waitFor({ state: 'hidden' });
+    ensure(await this.root.locator(this.selectors.rows).count() === 0, '保存後も入力画面が残っています。');
+    await new DraftListPage(this.root, this.selectors.draftList!).openMonth(period);
+    await this.root.locator(this.selectors.title).waitFor({ state: 'visible' });
+    await this.draftButton().waitFor({ state: 'visible' });
+    await this.assertPeriod(period, async () => false);
+    // Read only: saving again could conceal a failed first save.
+    for (const day of plan) await this.verify(day);
   }
   private async saveDraftWithCount(): Promise<void> {
     const before = await this.readDraftCount();

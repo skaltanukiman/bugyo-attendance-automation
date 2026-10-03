@@ -15,12 +15,16 @@ export const selectorsSchema = z.object({
   dateEvidence: z.object({ selector, attribute: selector }).optional(),
   editor: selector.nullable(), editButton: selector.nullable(), applyButton: selector.nullable(),
   fields: z.object({ pattern: field, reason: field, start: field, end: field, break: field, worked: readable }),
-  saveMode: z.enum(['message', 'countAndReturn']).optional(),
+  saveMode: z.enum(['message', 'countAndReturn', 'reopenDraft']).optional(),
   saveSuccess: selector.nullable(), saveSuccessText: selector.nullable(),
   draftCount: selector.nullable().optional(), returnMarker: selector.nullable().optional(),
+  draftList: z.object({ entry: selector, title: selector, loaded: selector, rows: selector,
+    status: selector, name: selector, period: selector, open: selector, openEditor: selector }).nullable().optional(),
   timeoutMs: z.number().int().min(100).max(120000)
 }).superRefine((s, ctx) => {
-  if (s.saveMode === 'countAndReturn' ? !s.draftCount || !s.returnMarker : !s.saveSuccess || !s.saveSuccessText) ctx.addIssue({ code: 'custom', message: '保存成功の確認方法を設定してください。' });
+  const saveConfigured = s.saveMode === 'reopenDraft' ? s.returnMarker && s.draftList
+    : s.saveMode === 'countAndReturn' ? s.draftCount && s.returnMarker : s.saveSuccess && s.saveSuccessText;
+  if (!saveConfigured) ctx.addIssue({ code: 'custom', message: '保存成功の確認方法を設定してください。' });
   if (s.periodSource === 'rowDates' ? !s.dateEvidence : !s.period) ctx.addIssue({ code: 'custom', message: '対象年月の取得元を設定してください。' });
   if (Boolean(s.editor) !== Boolean(s.editButton) || Boolean(s.editor) !== Boolean(s.applyButton)) ctx.addIssue({ code: 'custom', message: 'ダイアログ編集は editor / editButton / applyButton をすべて設定してください。' });
   for (const k of ['pattern', 'reason', 'start', 'end', 'break'] as const) {

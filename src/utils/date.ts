@@ -30,6 +30,15 @@ export function parseScreenPeriod(text: string): { year?: number; month: number 
   ensure(month >= 1 && month <= 12, '画面の月が不正です。');
   return { year, month };
 }
+export function isWholeMonthRange(text: string, period: Period): boolean {
+  const normalized = text.normalize('NFKC').replace(/\s+/g, '');
+  const dates = [...normalized.matchAll(/(?:(令和|平成)(元|\d+)年|(\d{4})年)(\d{1,2})月(\d{1,2})日/g)].map(m => ({
+    year: m[3] ? Number(m[3]) : (m[1] === '令和' ? 2018 : 1988) + (m[2] === '元' ? 1 : Number(m[2])),
+    month: Number(m[4]), day: Number(m[5])
+  }));
+  return dates.length === 2 && dates.every(d => d.year === period.year && d.month === period.month)
+    && dates[0].day === 1 && dates[1].day === daysInMonth(period);
+}
 export function timestamp(date: Date, format: string): string {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(date);
   const get = (key: string) => parts.find(p => p.type === key)!.value;
