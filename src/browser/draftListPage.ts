@@ -8,10 +8,11 @@ export class DraftListPage {
   constructor(readonly root: Page | FrameLocator, readonly config: NonNullable<Selectors['draftList']>) {}
   async openMonth(period: Period): Promise<void> {
     await safeClick(this.root.locator(this.config.entry));
-    await this.root.locator(this.config.title).waitFor({ state: 'visible' });
+    const titleLocator = this.root.locator(this.config.title).filter({ visible: true });
+    await titleLocator.waitFor({ state: 'visible' });
     await this.root.locator(this.config.loaded).waitFor({ state: 'visible' });
     await unique(this.root.locator(this.config.loaded), '下書き一覧の読込完了表示');
-    const title = await unique(this.root.locator(this.config.title), '下書き一覧タイトル');
+    const title = await unique(titleLocator, '下書き一覧タイトル');
     ensure((await title.innerText()).trim() === '申請状況', '下書き一覧画面を確認できません。');
     const matches: Locator[] = [];
     for (const row of await this.root.locator(this.config.rows).all()) {

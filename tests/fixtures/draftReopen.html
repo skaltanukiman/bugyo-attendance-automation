@@ -5,7 +5,7 @@ window.testMode = 'existing';
 window.stats = { saves: 0, applications: 0, viewed: 0, opened: 0, deleted: 0 };
 window.persisted = { pattern: '200', reason: '', start: '', end: '', break: '', worked: '' };
 function editor(data) {
- document.body.innerHTML = `<h1>勤務実績申請</h1><p id="period">2032年2月</p>
+ document.body.innerHTML = `<h1>勤務実績申請</h1><h1 hidden>勤務実績申請</h1><p id="period">2032年2月</p>
  <p class="count">下書き:1件</p><table id="attendance"><tbody><tr data-attendance>
  <td data-date>2/1 (日)</td><td><input data-pattern value="${data.pattern}"></td><td><input data-reason value="${data.reason}"></td>
  <td><input data-start value="${data.start}"></td><td><input data-end value="${data.end}"></td><td><input data-break value="${data.break}"></td><td data-worked>${data.worked}</td>
@@ -25,7 +25,7 @@ function editor(data) {
  };
 }
 function list() {
- document.body.innerHTML = '<h1>申請状況</h1><table id="list"><tbody></tbody></table><p id="loaded">すべてのデータを取得しました。</p>';
+ document.body.innerHTML = '<h1>申請状況</h1><h1 hidden>申請状況</h1><table id="list"><tbody></tbody></table><p id="loaded">すべてのデータを取得しました。</p>';
  const records = [
    { status: '下書き', month: 1 },
    { status: '承認待ち', month: 2 },

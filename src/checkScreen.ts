@@ -7,7 +7,7 @@ import { loadSettings } from './domain/config.js';
 import { Prompt } from './cli/prompt.js';
 import { daysInMonth } from './utils/date.js';
 import { inspectionSelectorsSchema } from './browser/selectors.js';
-import { AttendancePage } from './browser/attendancePage.js';
+import { findAttendancePage } from './browser/findAttendancePage.js';
 import { launchEdge, connectEdge, disconnect } from './browser/edgeLauncher.js';
 import { inspectScreen } from './services/screenInspection.js';
 
@@ -44,14 +44,9 @@ try {
   await prompt.question('起動した専用Edgeで手動ログインし、対象月の「勤務実績申請」入力画面を開いてください。\n入力欄の編集を終えてから、このコンソールに戻りEnterを押してください。');
   stage = '接続・対象画面の識別';
   browser = await connectEdge(settings.browser.remoteDebuggingPort);
-  const candidates: AttendancePage[] = [];
-  for (const context of browser.contexts()) for (const tab of context.pages()) {
-    const port = new AttendancePage(tab, selectors);
-    if (await port.matches()) candidates.push(port);
-  }
-  ensure(candidates.length === 1, '入力画面を一意に識別できません。対象タブを1つだけ開き、タイトルとiframe設定を確認してください。');
+  const page = await findAttendancePage(browser, selectors, 'normal', console.log);
   stage = '全日付・各項目の読取';
-  const result = await inspectScreen(candidates[0], period, sampleDay);
+  const result = await inspectScreen(page, period, sampleDay);
   console.log(`確認成功: 対象年月・全${result.days}日・各日の6項目を読み取れました。`);
   console.log(`確認日 ${sampleDay}日: 勤務体系=${result.sample.pattern || '空欄'} / 事由=${result.sample.reason || '空欄'} / 出勤=${result.sample.start || '空欄'} / 退出=${result.sample.end || '空欄'} / 休憩=${result.sample.break || '空欄'} / 実働=${result.sample.worked || '空欄'}`);
   console.log('表示された確認日の値が画面と一致するか確認してください。読取成功だけでは入力・保存の動作確認は完了しません。');

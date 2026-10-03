@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { chromium, type Browser, type Page } from 'playwright';
 import { AttendancePage, safeClick } from '../src/browser/attendancePage.js';
+import { findAttendancePage } from '../src/browser/findAttendancePage.js';
 import { selectorsSchema } from '../src/browser/selectors.js';
 import { buildPlan } from '../src/services/validationService.js';
 import { enterAndSave, initialState } from '../src/services/attendanceService.js';
@@ -79,6 +80,37 @@ test('未校正の本番セレクタは受理しない', async () => {
   const config = JSON.parse(await readFile(new URL('../config/selectors.json', import.meta.url), 'utf8'));
   assert.equal(selectorsSchema.safeParse(config).success, false);
 });
+test('非表示の同名タイトルとボタンを除外して入力画面を識別する', async () => fixture(async page => {
+  await page.evaluate(() => {
+    const template = document.createElement('section'); template.hidden = true;
+    template.innerHTML = '<p>勤務実績申請</p><div>勤務実績申請</div><button type="button">下書き保存</button>';
+    document.body.append(template);
+  });
+  const config = { ...selectors, title: 'text="勤務実績申請"' };
+  const log: string[] = [];
+  const port = await findAttendancePage(browser, config, 'normal', message => log.push(message));
+  assert.deepEqual(await port.identificationCounts(), { titles: 3, visibleTitles: 1, draftButtons: 1, rows: 5 });
+  await port.assertPeriod(period, async () => true);
+  assert.match(log[0], /タイトル=3（表示中1）/);
+  assert.deepEqual(await stats(page), { applications: 0, drafts: 0, changes: 0 });
+}));
+test('表示タイトルが複数・候補タブが複数なら件数を示して入力前に停止する', async () => fixture(async page => {
+  const config = { ...selectors, title: 'text="勤務実績申請"' };
+  await page.evaluate(() => {
+    const extra = document.createElement('p'); extra.id = 'extraTitle'; extra.textContent = '勤務実績申請'; document.body.append(extra);
+  });
+  const log: string[] = [];
+  await assert.rejects(() => findAttendancePage(browser, config, 'normal', message => log.push(message)), /候補が0件/);
+  assert.match(log[0], /表示中2/);
+  await page.locator('#extraTitle').evaluate(el => el.remove());
+  const second = await browser.newPage();
+  try {
+    await second.setContent(html);
+    await assert.rejects(() => findAttendancePage(browser, config, 'normal', () => {}), /候補が2件/);
+    assert.deepEqual(await stats(page), { applications: 0, drafts: 0, changes: 0 });
+    assert.deepEqual(await stats(second), { applications: 0, drafts: 0, changes: 0 });
+  } finally { await second.close(); }
+}));
 test('行の編集ダイアログ方式もセレクタ差し替えで入力できる', async () => fixture(async (page) => {
   await page.evaluate(() => {
     const dialog = document.createElement('section'); dialog.id = 'editor'; dialog.hidden = true;

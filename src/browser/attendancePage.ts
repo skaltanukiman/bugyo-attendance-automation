@@ -23,8 +23,13 @@ export class AttendancePage implements AttendancePort {
     page.setDefaultTimeout(selectors.timeoutMs);
   }
   async matches(): Promise<boolean> {
-    const title = this.root.locator(this.selectors.title);
+    const title = this.pageTitle();
     return await title.count() === 1 && await title.isVisible() && (await title.innerText()).trim() === '勤務実績申請' && await this.draftButton().count() === 1;
+  }
+  pageTitle() { return this.root.locator(this.selectors.title).filter({ visible: true }); }
+  async identificationCounts(): Promise<{ titles: number; visibleTitles: number; draftButtons: number; rows: number }> {
+    return { titles: await this.root.locator(this.selectors.title).count(), visibleTitles: await this.pageTitle().count(),
+      draftButtons: await this.draftButton().count(), rows: await this.root.locator(this.selectors.rows).count() };
   }
   draftButton() { return this.root.getByRole('button', { name: '下書き保存', exact: true }); }
   async assertPeriod(period: Period, confirmYear: () => Promise<boolean>): Promise<void> {
@@ -187,7 +192,7 @@ export class AttendancePage implements AttendancePort {
     await this.draftButton().waitFor({ state: 'hidden' });
     ensure(await this.root.locator(this.selectors.rows).count() === 0, '保存後も入力画面が残っています。');
     await new DraftListPage(this.root, this.selectors.draftList!).openMonth(period);
-    await this.root.locator(this.selectors.title).waitFor({ state: 'visible' });
+    await this.pageTitle().waitFor({ state: 'visible' });
     await this.draftButton().waitFor({ state: 'visible' });
     await this.assertPeriod(period, async () => false);
     // Read only: saving again could conceal a failed first save.

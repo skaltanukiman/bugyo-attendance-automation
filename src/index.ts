@@ -16,7 +16,7 @@ import { buildPlan } from './services/validationService.js';
 import { enterAndSave, initialState } from './services/attendanceService.js';
 import { backupFile, fingerprint } from './services/backupService.js';
 import { selectorsForRun } from './browser/selectors.js';
-import { AttendancePage } from './browser/attendancePage.js';
+import { findAttendancePage } from './browser/findAttendancePage.js';
 import { launchEdge, connectEdge, disconnect } from './browser/edgeLauncher.js';
 
 export async function main(): Promise<void> {
@@ -67,14 +67,9 @@ export async function main(): Promise<void> {
     await prompt.question('Microsoft Edgeを起動しました。\n1. 手動で奉行クラウドへログインしてください。\n2. 「勤務実績申請」画面で対象月を表示してください。\n準備が完了したら、このコンソールへ戻りEnterを押してください。');
     state.stage = 'Edge接続・対象タブ確認';
     browser = await connectEdge(settings.browser.remoteDebuggingPort);
-    const candidates: AttendancePage[] = [];
-    for (const context of browser.contexts()) for (const tab of context.pages()) {
-      const page = new AttendancePage(tab, selectors, mode);
-      if (await page.matches()) candidates.push(page);
-    }
-    ensure(candidates.length === 1, '勤務実績申請画面を一意に特定できません。対象タブを1つだけ開いてください。');
+    const page = await findAttendancePage(browser, selectors, mode, log);
     let yearConfirmed = false;
-    await enterAndSave(candidates[0], period, plan, settings.attendance.remoteReasonCode, state, log, async () => {
+    await enterAndSave(page, period, plan, settings.attendance.remoteReasonCode, state, log, async () => {
       if (!yearConfirmed) yearConfirmed = await prompt!.confirm(`画面から年を取得できません。表示は本当に${period.year}年${period.month}月ですか？`);
       return yearConfirmed;
     });
