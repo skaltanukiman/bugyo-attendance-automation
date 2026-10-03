@@ -3,7 +3,7 @@
   "frame": null,
   "title": "text=\"勤務実績申請\"",
   "period": null,
-  "rows": "tr.js-cm-scrTbl__innerTr",
+  "rows": "tr.js-cm-scrTbl__innerTr:has(input[data-labordate])",
   "dateCell": "td.js-inputTableDate",
   "editor": null,
   "editButton": null,

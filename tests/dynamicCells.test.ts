@@ -75,6 +75,12 @@ async function fixture(action: (page: import('playwright').Page, port: Attendanc
           }
         });
       }
+      // The same table-row class may also occur on non-date headers/totals.
+      for (const text of ['テスト見出し', 'テスト集計']) {
+        const extra = document.createElement('tr'); extra.className = 'js-cm-scrTbl__innerTr';
+        const cell = document.createElement('td'); cell.textContent = text; extra.append(cell);
+        document.querySelector('#table > tbody')!.append(extra);
+      }
       document.querySelector('#submit')!.addEventListener('click', () => w.applied++);
       document.querySelector('#save')!.addEventListener('click', () => { w.saved++; const el = document.querySelector('#saved') as HTMLElement; el.hidden = false; el.textContent = 'テスト下書き完了'; });
     });
@@ -138,10 +144,14 @@ test('年月表示なしでも全行の年月日属性で対象月を照合す�
     }
   });
   const port = new AttendancePage(page, { ...selectors, title: settings.title, period: null, periodSource: 'rowDates' });
+  assert.equal(await page.locator('tr.js-cm-scrTbl__innerTr').count(), 31);
+  assert.equal(await page.locator(settings.rows).count(), 29);
   await port.assertPeriod(period, async () => { throw Error('属性で年が分かるので追加確認は不要'); });
   await assert.rejects(() => port.assertPeriod({ year: 2031, month: 2 }, async () => true), /対象年月/);
   await page.locator('[data-testday="3"] [data-labordate]').evaluate(el => el.setAttribute('data-labordate', '2032/03/03 0:00:00'));
   await assert.rejects(() => port.assertPeriod(period, async () => true), /対象年月/);
+  await page.locator('[data-testday="3"] [data-labordate]').evaluate(el => el.removeAttribute('data-labordate'));
+  await assert.rejects(() => port.assertPeriod(period, async () => true), /全日付/);
   assert.equal(await page.evaluate(() => (window as any).commits), 0);
 }));
 test('年月の取得元が不十分または日付表示と矛盾する場合は停止', async () => fixture(async (page) => {
