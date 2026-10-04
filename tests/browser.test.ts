@@ -76,9 +76,10 @@ test('計算結果の不一致は下書き保存しない', async () => fixture(
   await assert.rejects(() => enterAndSave(port, period, buildPlan([record(1)], [], [], codes), '007', initialState(), () => {}, async () => true));
   assert.equal((await stats(page)).drafts, 0);
 }));
-test('未校正の本番セレクタは受理しない', async () => {
+test('確認済みの本番設定を受理し、未確認に戻した設定は拒否する', async () => {
   const config = JSON.parse(await readFile(new URL('../config/selectors.json', import.meta.url), 'utf8'));
-  assert.equal(selectorsSchema.safeParse(config).success, false);
+  assert.equal(selectorsSchema.safeParse(config).success, true);
+  assert.equal(selectorsSchema.safeParse({ ...config, verified: false }).success, false);
 });
 test('非表示の同名タイトルとボタンを除外して入力画面を識別する', async () => fixture(async page => {
   await page.evaluate(() => {
