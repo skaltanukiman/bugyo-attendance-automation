@@ -448,7 +448,7 @@ RunStateのverified && saved → backupFile ＋ 元hash ＋ Settings.files → r
 
 ### 既存資料との照合と現在の未対応範囲
 
-`README.md`と`はじめに_使い方.md`の主要な通常/再確認/画面確認フローは現在のコードと一致します。`docs/investigation.md`末尾の「未確認項目が残るため本番実行は停止させています」は調査初期の状態で、現在のverified=trueと異なります。現在の切替経緯は`docs/verification.md`末尾と`docs/selectors.md`に記載されています。
+`README.md`と`はじめに_使い方.md`の主要な通常/再確認/画面確認フローは現在のコードと一致します。現在の切替経緯は`docs/verification.md`末尾と`docs/selectors.md`に記載されています。
 
 既存資料の「Excelコピーの退避」はinputに配置したコピーを指す文脈があります。実装の退避操作は一貫してrenameによる移動であり、inputにファイルを残すcopy機能はありません。READMEの移動説明とも一致します。
 

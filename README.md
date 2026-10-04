@@ -232,7 +232,7 @@ npm test
 | [はじめに_使い方.md](はじめに_使い方.md) | 利用者向けの毎月の簡易操作手順 |
 | [docs/feature-map.md](docs/feature-map.md) | 開発者向けの機能・実装・設定・テストの索引。調査はここから開始 |
 | [docs/selectors.md](docs/selectors.md) | 奉行DOM・セレクタ設定・実画面確認の手順 |
-| [docs/investigation.md](docs/investigation.md) | Excelセル配置や提供資料の初期調査。末尾の本番停止の記述は調査当時の状態 |
+| [docs/investigation.md](docs/investigation.md) | Excelセル配置や提供資料の初期調査 |
 | [docs/verification.md](docs/verification.md) | 実装・模擬テスト・実画面検証と通常実行への切替の経緯 |
 
 現在の挙動は実装・設定・テストを正とします。調査資料・検証経緯の過去の段階と、現在の運用設定を区別してください。
