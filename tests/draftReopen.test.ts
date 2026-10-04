@@ -178,32 +178,14 @@ test('確認操作の例外でも申請・削除・送信ボタンと誤った�
   await assert.rejects(() => safeClick(button, 'draftEditor'));
   assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 0, applications: 0, viewed: 0, opened: 0, deleted: 0 });
 }));
-test('通しテストを明示した場合だけ未確認設定で入力・保存・再読取できる', async () => fixture('existing', async (page) => {
+test('通常実行は確認済み設定だけ受理し、再確認専用の起動引数を区別する', async () => {
   const raw = { ...config, verified: false };
   assert.equal(executionMode([]), 'normal');
-  assert.equal(executionMode(['--trial']), 'trial');
   assert.equal(executionMode(['--verify-draft']), 'verifyDraft');
-  assert.throws(() => executionMode(['--trial', '--verify-draft']));
-  assert.throws(() => executionMode(['--trial', '--unknown']));
+  assert.throws(() => executionMode(['--trial']));
+  assert.throws(() => executionMode(['--verify-draft', '--unknown']));
   assert.throws(() => selectorsForRun(raw, 'normal'), /未確認/);
-  assert.throws(() => selectorsForRun({ ...raw, draftList: null }, 'trial'), /不正/);
-  const trial = selectorsForRun(raw, 'trial');
-  const port = new AttendancePage(page, trial, 'trial');
-  await page.locator('[data-pattern]').fill('200');
-  const state = initialState();
-  await enterAndSave(port, period, plan, '007', state, () => {}, async () => false);
-  assert.equal(state.inputStarted, true); assert.equal(state.saved, true);
-  assert.equal((await port.read(plan[0])).pattern, '205');
-  assert.equal(trial.verified, false); assert.equal(raw.verified, false);
-  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
-}));
-test('通しテストでも年月違い・既存値競合の保護は維持する', async () => {
-  for (const mismatch of ['period', 'conflict']) await fixture('existing', async (page) => {
-    const port = new AttendancePage(page, selectorsForRun({ ...config, verified: false }, 'trial'), 'trial');
-    if (mismatch === 'conflict') await page.locator('[data-start]').fill('11:00');
-    const state = initialState();
-    await assert.rejects(() => enterAndSave(port, mismatch === 'period' ? { year: 2033, month: 2 } : period, plan, '007', state, () => {}, async () => false));
-    assert.equal(state.inputStarted, false); assert.equal(state.saved, false);
-    assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 0, applications: 0, viewed: 0, opened: 0, deleted: 0 });
-  });
+  assert.throws(() => selectorsForRun({ ...raw, draftList: null }, 'verifyDraft'), /不正/);
+  assert.equal(selectorsForRun(config, 'normal').verified, true);
+  assert.equal(selectorsForRun(config, 'verifyDraft').verified, false);
 });

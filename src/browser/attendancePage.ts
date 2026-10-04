@@ -131,7 +131,7 @@ export class AttendancePage implements AttendancePort {
     }
   }
   async write(day: PlannedDay): Promise<void> {
-    ensure(this.mode !== 'verifyDraft' && (this.selectors.verified || this.mode === 'trial'), '再確認専用モードまたは未確認のセレクタでは入力できません。');
+    ensure(this.mode !== 'verifyDraft' && this.selectors.verified, '再確認専用モードまたは未確認のセレクタでは入力できません。');
     const row = await this.row(day);
     let scope: Locator = row;
     if (this.selectors.editButton) {
@@ -187,7 +187,7 @@ export class AttendancePage implements AttendancePort {
     ensure(false, `${day.record.date}: 読取値が期待値と一致しません。処理を停止します。`);
   }
   async saveDraft(period?: Period, plan?: PlannedDay[]): Promise<void> {
-    ensure(this.mode !== 'verifyDraft' && (this.selectors.verified || this.mode === 'trial'), '再確認専用モードまたは未確認のセレクタでは下書き保存できません。');
+    ensure(this.mode !== 'verifyDraft' && this.selectors.verified, '再確認専用モードまたは未確認のセレクタでは下書き保存できません。');
     if (this.selectors.saveMode === 'reopenDraft') {
       ensure(period && plan?.length, '下書き再読取には対象年月と入力予定が必要です。');
       await this.saveAndReopen(period, plan);

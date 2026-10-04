@@ -1,6 +1,6 @@
 # 実画面へのセレクタ設定
 
-`src/browser/attendancePage.ts` にDOMの構造やCSSクラスを埋め込まず、`config/selectors.json` に分離しています。未設定の要素があるか `verified: false` の間は通常の自動入力・保存に進みません。`check-screen.bat` は未確認設定でも読取だけを行えます。利用者が指示した通しテストは `test-run.bat`（`--trial`）で実行します。未確認設定での入力・保存をその実行の間だけ許可し、設定構造・年月・競合・保存内容の検証と最終申請の禁止は維持します。以下は実画面確認担当者向けの手順です。
+`src/browser/attendancePage.ts` にDOMの構造やCSSクラスを埋め込まず、`config/selectors.json` に分離しています。未設定の要素があるか `verified: false` の間は通常の自動入力・保存に進みません。`check-screen.bat` は未確認設定でも読取だけを行えます。開発時の未確認設定による通しテスト経路は削除済みです。通常実行では確認済み設定だけを受理し、最終申請の禁止を維持します。以下は実画面確認担当者向けの手順です。
 
 ## 確認する情報
 

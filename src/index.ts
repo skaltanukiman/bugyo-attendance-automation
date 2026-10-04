@@ -32,7 +32,6 @@ export async function main(): Promise<void> {
     try { const lock = await open(lockPath, 'wx'); await lock.writeFile(String(process.pid)); await lock.close(); locked = true; }
     catch { throw new UserError('別の処理が実行中、または前回のロックが残っています。.runtime/run.lockを確認してください。'); }
     log = createLogger('logs');
-    if (mode === 'trial') log('通しテスト: 未確認の設定で実画面への入力・検証・下書き保存・再読取・Excel退避を実行します。最終申請は行いません。');
     if (mode === 'verifyDraft') log('保存済み下書きの再確認: 対象下書きを開き、Excelと照合して成功時のみ退避します。入力・再保存・申請は行いません。');
     state.stage = '設定読み込み';
     const settings = await loadSettings('config/settings.json');
@@ -60,7 +59,7 @@ export async function main(): Promise<void> {
     for (const r of records.filter(r => !r.hasWork && !paid.includes(r.day))) log(`${r.date} 非対象 SKIP（休暇種別は判定しません）`);
     if (paidUnset) log(leaveWarning(paidCode));
     ensure(plan.length > 0, '入力対象日がありません。');
-    if (!await prompt.confirm(mode === 'verifyDraft' ? 'この内容で保存済み下書きの照合・Excel退避を開始しますか？' : mode === 'trial' ? 'この内容で下書き保存までの通しテストを開始しますか？' : 'この内容でブラウザを起動しますか？', true)) { log('キャンセルしました。画面とExcelは変更していません。'); return; }
+    if (!await prompt.confirm(mode === 'verifyDraft' ? 'この内容で保存済み下書きの照合・Excel退避を開始しますか？' : 'この内容でブラウザを起動しますか？', true)) { log('キャンセルしました。画面とExcelは変更していません。'); return; }
     state.stage = 'セレクタ設定確認';
     const selectors = selectorsForRun(JSON.parse(await readFile(settings.browser.selectorsFile, 'utf8')), mode);
     state.stage = 'Edge起動';
@@ -94,7 +93,7 @@ export async function main(): Promise<void> {
       process.exitCode = 2;
     }
     log(summary(file, period, plan, settings.attendance));
-    log(mode === 'verifyDraft' ? '保存済み下書きの照合が完了しました。入力・再保存・申請は実行していません。' : mode === 'trial' ? '通しテストの入力・検証・下書き保存・保存内容の再確認が完了しました。下書きの状態で終了します。verified設定は変更していません。' : '勤務実績入力・検証・下書き保存が完了しました。ブラウザを確認し、問題がなければ利用者自身が「申請」してください。');
+    log(mode === 'verifyDraft' ? '保存済み下書きの照合が完了しました。入力・再保存・申請は実行していません。' : '勤務実績入力・検証・下書き保存が完了しました。ブラウザを確認し、問題がなければ利用者自身が「申請」してください。');
   } catch (error) {
     process.exitCode = 1;
     const detail = error instanceof UserError ? error.message : '処理に失敗しました。設定・ファイル・画面状態を確認してください（認証情報保護のため生のエラーは記録しません）。';
