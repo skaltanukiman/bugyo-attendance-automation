@@ -15,5 +15,6 @@ if not exist node_modules\tsx (
 )
 node node_modules\tsx\dist\cli.mjs src\index.ts
 set "RUN_RESULT=%ERRORLEVEL%"
+echo このコンソールは閉じても大丈夫です。
 pause
 exit /b %RUN_RESULT%
