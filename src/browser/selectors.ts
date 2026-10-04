@@ -23,7 +23,10 @@ const selectorsDefinition = z.object({
   draftCount: selector.nullable().optional(), returnMarker: selector.nullable().optional(),
   draftList: z.object({ entry: selector, title: selector, loaded: selector, rows: selector,
     status: selector, name: selector, period: selector, open: selector, openEditor: selector }).nullable().optional(),
-  timeoutMs: z.number().int().min(100).max(120000)
+  timeoutMs: z.number().int().min(100).max(120000),
+  transitionTimeoutMs: z.number().int().min(100).max(120000).optional(),
+  busy: selector.optional(),
+  transitionStableMs: z.number().int().min(0).max(5000).optional()
 });
 function validateSelectors(s: z.infer<typeof selectorsDefinition>, ctx: z.RefinementCtx) {
   const saveConfigured = s.saveMode === 'reopenDraft' ? s.returnMarker && s.draftList

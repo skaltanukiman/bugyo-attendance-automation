@@ -76,6 +76,9 @@
   "saveSuccess": null,
   "saveSuccessText": null,
   "timeoutMs": 10000,
+  "transitionTimeoutMs": 60000,
+  "busy": ".js-cm-progressBase",
+  "transitionStableMs": 1000,
   "dateEvidence": {
     "selector": "input[data-labordate]",
     "attribute": "data-labordate"

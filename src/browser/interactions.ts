@@ -5,9 +5,19 @@ export async function unique(locator: Locator, label: string): Promise<Locator> 
   ensure(await locator.count() === 1 && await locator.isVisible(), `${label}: 要素がない、複数ある、または非表示です。`);
   return locator;
 }
-export async function waitVisible(locator: Locator, label: string): Promise<void> {
-  try { await locator.waitFor({ state: 'visible' }); }
-  catch { ensure(false, `${label}: 一意な表示要素を待機できませんでした。読み込み状態とセレクタを確認してください。`); }
+export async function waitUntil(check: () => Promise<boolean>, label: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    try { if (await check()) return; }
+    catch { /* Navigation may replace the document between read-only checks. */ }
+    await new Promise(resolve => setTimeout(resolve, Math.min(100, Math.max(0, deadline - Date.now()))));
+  } while (Date.now() < deadline);
+  ensure(false, `${label}: ${timeoutMs / 1000}秒以内に表示が揃いませんでした。読み込み状態とセレクタを確認してください。再クリックはしていません。`);
+}
+export async function waitVisible(locator: Locator, label: string, timeoutMs = 10000): Promise<void> {
+  // Locator.waitFor fails immediately on temporary duplicate matches.
+  // Poll reads until unique and visible; never choose first() or repeat clicks.
+  await waitUntil(async () => await locator.count() === 1 && await locator.isVisible(), label, timeoutMs);
 }
 // All clicks pass this guard. Application submission is never an allowed action.
 export async function safeClick(locator: Locator, action: boolean | 'draftList' | 'draftDetails' | 'draftEditor' = false, label = '操作対象'): Promise<void> {

@@ -4,6 +4,13 @@
 window.testMode = 'existing';
 window.stats = { saves: 0, applications: 0, viewed: 0, opened: 0, deleted: 0 };
 window.persisted = { pattern: '200', reason: '', start: '', end: '', break: '', worked: '' };
+window.ignoredClicks = 0;
+function busyIndicator() {
+ window.busy = true;
+ const indicator=document.createElement('div');indicator.className='js-cm-progressBase';
+ indicator.style='width:20px;height:20px;pointer-events:none';document.body.append(indicator);
+ if(window.testMode!=='busyStuck')setTimeout(()=>{window.busy=false;indicator.remove();},300);
+}
 function editor(data) {
  document.body.innerHTML = `<h1>勤務実績申請</h1><h1 hidden>勤務実績申請</h1><p id="period">2032年2月</p>
  <p class="count">下書き:1件</p><table id="attendance"><tbody><tr data-attendance>
@@ -33,6 +40,15 @@ function returned() {
 }
 function list() {
  document.body.innerHTML = '<h1>申請状況</h1><h1 hidden>申請状況</h1><table id="list"><tbody></tbody></table><p id="loaded">すべてのデータを取得しました。</p>';
+ if(['busyList','busyStuck'].includes(window.testMode))busyIndicator();
+ if(window.testMode==='initializingList') {
+   window.initializing=true;
+   setTimeout(()=>{window.initializing=false;},150);
+ }
+ if(window.testMode==='phasedEditor') {
+   const transient=document.querySelector('h1').cloneNode(true); document.body.append(transient);
+   setTimeout(() => transient.remove(), 100);
+ }
  if(window.testMode==='hiddenTemplates') {
    const hidden=document.createElement('section'); hidden.hidden=true;
    hidden.innerHTML='<p id="loaded">すべてのデータを取得しました。</p><button class="js-edit" data-actionlog-actiontype="申請書入力" type="button">申請書入力</button>';
@@ -50,19 +66,32 @@ function list() {
    row.className='js-tm-tableRow js-cm-scrTbl__innerTr';
    row.innerHTML=`<td><table><tbody><tr><td data-columnindex="0"><label><span class="js-cm-statusLabel_text">${record.status}</span></label></td><td data-columnindex="1"><a href="" class="js-tm-showItem" title="勤務実績申請">勤務実績申請</a></td></tr></tbody></table></td>
    <td><table><tbody><tr><td data-columnindex="2">【申請期間】<br>令和14年${record.month}月1日(日) ～ 令和14年${record.month}月${last}日(日)</td></tr></tbody></table></td>`;
-   row.querySelector('a').onclick=function(event) {event.preventDefault();window.stats.viewed++;details();};
+   row.querySelector('a').onclick=function(event) {event.preventDefault();if(window.busy){window.ignoredClicks++;return;}window.stats.viewed++;details();};
    document.querySelector('#list tbody').append(row);
  }
 }
 function details() {
  if(window.testMode==='noDetails') return;
  const panel=document.createElement('section'); panel.id='details';
+ if(window.initializing)panel.hidden=true;
  panel.innerHTML='<h2>勤務実績申請</h2><button id="openEditor" class="js-edit" data-actionlog-actiontype="申請書入力" type="button">申請書入力</button><button id="deleteDraft" type="button">削除</button><button id="detailSubmit" type="button">申請</button>';
  if(window.testMode==='duplicateEditor') panel.append(panel.querySelector('#openEditor').cloneNode(true));
- panel.querySelector('#openEditor').onclick=function() {window.stats.opened++;editor(window.persisted);};
+ panel.querySelector('#openEditor').onclick=function() {
+   if(window.busy){window.ignoredClicks++;return;}
+   window.stats.opened++;
+   if(['phasedEditor','stuckEditor'].includes(window.testMode)) {
+     document.body.innerHTML='<h1>勤務実績申請</h1><h1>勤務実績申請</h1>';
+     if(window.testMode==='phasedEditor') setTimeout(() => {
+       editor(window.persisted);
+       const table=document.querySelector('#attendance'); table.remove();
+       setTimeout(() => document.body.append(table), 700);
+     }, 150);
+   } else editor(window.persisted);
+ };
  panel.querySelector('#deleteDraft').onclick=function() {window.stats.deleted++;};
  panel.querySelector('#detailSubmit').onclick=function() {window.stats.applications++;};
  document.body.append(panel);
+ if(window.testMode==='busyList')busyIndicator();
 }
 document.addEventListener('DOMContentLoaded', () => editor({pattern:'205',reason:'007',start:'10:15',end:'18:45',break:'1.50',worked:'7.00'}));
 </script><body></body>

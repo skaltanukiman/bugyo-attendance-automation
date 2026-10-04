@@ -5,7 +5,7 @@ import { daysInMonth, parseScreenPeriod } from '../utils/date.js';
 import { equals, normalize, normalized } from '../services/validationService.js';
 import type { InspectionSelectors, FieldKey } from './selectors.js';
 import { timeParts, decimalParts } from './splitInput.js';
-import { safeClick, unique, waitVisible } from './interactions.js';
+import { safeClick, unique, waitVisible, waitUntil } from './interactions.js';
 import { DraftListPage } from './draftListPage.js';
 export { safeClick } from './interactions.js';
 
@@ -227,14 +227,26 @@ export class AttendancePage implements AttendancePort {
   async reopenDraft(period: Period, plan: PlannedDay[]): Promise<void> {
     ensure(this.selectors.saveMode === 'reopenDraft' && plan.length > 0, '下書き再読取の設定または入力予定がありません。');
     const marker = this.root.locator(this.selectors.returnMarker!).filter({ visible: true });
-    await waitVisible(marker, '保存後画面の目印');
+    const timeout = this.selectors.transitionTimeoutMs ?? this.selectors.timeoutMs;
+    await waitVisible(marker, '保存後画面の目印', timeout);
     await unique(marker, '保存後画面の目印');
     await this.draftButton().waitFor({ state: 'hidden' });
     ensure(await this.root.locator(this.selectors.rows).count() === 0, '保存後も入力画面が残っています。');
-    await new DraftListPage(this.root, this.selectors.draftList!).openMonth(period);
+    await new DraftListPage(this.root, this.selectors.draftList!, timeout, this.selectors.busy, this.selectors.transitionStableMs).openMonth(period);
+    await this.verifyOpenedDraft(period, plan);
+  }
+  async verifyOpenedDraft(period: Period, plan: PlannedDay[]): Promise<void> {
+    ensure(plan.length > 0, '下書きの照合対象がありません。');
     this.openedCodeValues.clear();
-    await waitVisible(this.pageTitle(), '下書き再表示後の入力画面タイトル');
-    await waitVisible(this.draftButton(), '下書き再表示後の入力画面');
+    await waitUntil(async () => {
+      if (this.selectors.busy && await this.root.locator(this.selectors.busy).filter({ visible: true }).count()) return false;
+      if (!await this.matches() || !await this.draftButton().isVisible()) return false;
+      const rows = this.root.locator(this.selectors.rows);
+      const count = await rows.count();
+      if (this.selectors.periodSource === 'rowDates' ? count !== daysInMonth(period) : count === 0) return false;
+      for (const field of Object.values(this.selectors.fields)) if (await rows.locator(field.read).count() !== count) return false;
+      return true;
+    }, '下書き再表示後の入力画面（タイトル・保存ボタン・日付行・読取項目）', this.selectors.transitionTimeoutMs ?? this.selectors.timeoutMs);
     await this.assertPeriod(period, async () => false);
     // Read only: saving again could conceal a failed first save.
     for (const day of plan) await this.verify(day);

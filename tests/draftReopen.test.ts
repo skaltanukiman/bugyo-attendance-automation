@@ -47,6 +47,42 @@ test('件数があるだけで成功にせず、古い保存値なら退避条�
   assert.equal(state.saved, false); assert.equal(state.backedUp, false);
   assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
 }));
+test('一覧の読込完了表示や入力ボタンが見えても全画面読込中にはクリックしない', async () => fixture('busyList', async (page) => {
+  const port = new AttendancePage(page, { ...config, busy: live.busy, transitionTimeoutMs: 3000 });
+  const state = initialState();
+  await enterAndSave(port, period, plan, '007', state, () => {}, async () => false);
+  assert.equal(state.saved, true);
+  assert.equal(await page.evaluate(() => (window as any).ignoredClicks), 0);
+  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+}));
+test('全画面読込が終了しなければ一覧リンクを押さず期限で停止する', async () => fixture('busyStuck', async (page) => {
+  const port = new AttendancePage(page, { ...config, busy: live.busy });
+  const state = initialState();
+  await assert.rejects(() => enterAndSave(port, period, plan, '007', state, () => {}, async () => false), /読込終了/);
+  assert.equal(state.saved, false);
+  assert.equal(await page.evaluate(() => (window as any).ignoredClicks), 0);
+  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 0, opened: 0, deleted: 0 });
+}));
+test('表示直後の初期化が終わり操作可能な状態が安定してから詳細を開く', async () => fixture('initializingList', async (page) => {
+  const port = new AttendancePage(page, { ...config, transitionStableMs: 200, transitionTimeoutMs: 3000 });
+  const state = initialState();
+  await enterAndSave(port, period, plan, '007', state, () => {}, async () => false);
+  assert.equal(state.saved, true);
+  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+}));
+test('遷移中のタイトル重複と遅れて現れる明細を待ち、保存や申請書入力を再クリックしない', async () => fixture('phasedEditor', async (page) => {
+  const port = new AttendancePage(page, { ...config, transitionTimeoutMs: 3000 });
+  const state = initialState();
+  await enterAndSave(port, period, plan, '007', state, () => {}, async () => false);
+  assert.equal(state.saved, true);
+  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+}));
+test('遷移中の重複が解消しない場合は期限で停止し、保存成功や再クリックにしない', async () => fixture('stuckEditor', async (page, port) => {
+  const state = initialState();
+  await assert.rejects(() => enterAndSave(port, period, plan, '007', state, () => {}, async () => false), /下書き再表示後.*再クリックはしていません/);
+  assert.equal(state.saved, false); assert.equal(state.backedUp, false);
+  assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+}));
 test('保存後の入口が遅れて表示されても待機し、非表示のテンプレートは操作しない', async () => {
   for (const mode of ['delayedEntry', 'hiddenTemplates']) await fixture(mode, async (page, port) => {
     const state = initialState();
