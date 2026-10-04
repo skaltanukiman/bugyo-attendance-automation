@@ -46,9 +46,9 @@ function validateSelectors(s: z.infer<typeof selectorsDefinition>, ctx: z.Refine
 export const selectorsSchema = selectorsDefinition.extend({ verified: z.literal(true) }).superRefine(validateSelectors);
 export const inspectionSelectorsSchema = selectorsDefinition.superRefine(validateSelectors);
 export function selectorsForRun(raw: unknown, mode: ExecutionMode): InspectionSelectors {
-  const parsed = (mode === 'trial' ? inspectionSelectorsSchema : selectorsSchema).safeParse(raw);
+  const parsed = (mode === 'normal' ? selectorsSchema : inspectionSelectorsSchema).safeParse(raw);
   ensure(parsed.success, '実DOMのセレクタが未設定、未確認、または設定が不正です。入力は開始していません。');
-  return parsed.data;
+  return mode === 'verifyDraft' ? { ...parsed.data, verified: false } : parsed.data;
 }
 export type Selectors = z.infer<typeof selectorsSchema>;
 export type InspectionSelectors = z.infer<typeof inspectionSelectorsSchema>;

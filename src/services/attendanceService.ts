@@ -3,6 +3,13 @@ import type { AttendancePort } from '../browser/attendancePage.js';
 import { conflicts, equals } from './validationService.js';
 export interface RunState { stage: string; inputStarted: boolean; verified: boolean; saveAttempted: boolean; saved: boolean; backedUp: boolean }
 export const initialState = (): RunState => ({ stage: '準備', inputStarted: false, verified: false, saveAttempted: false, saved: false, backedUp: false });
+export async function verifySavedDraft(page: { reopenDraft(period: Period, plan: PlannedDay[]): Promise<void> }, period: Period, plan: PlannedDay[], state: RunState, log: (message: string) => void): Promise<void> {
+  state.stage = '保存済み下書きの再表示・照合';
+  state.verified = false; state.saved = false;
+  await page.reopenDraft(period, plan);
+  state.verified = true; state.saved = true;
+  log('保存済み下書きの対象年月・全対象日の保存内容がExcelと一致しました。再入力・再保存はしていません。');
+}
 export async function enterAndSave(page: AttendancePort, period: Period, plan: PlannedDay[], remoteCode: string, state: RunState, log: (message: string) => void, confirmYear: () => Promise<boolean>): Promise<void> {
   ensure(plan.length > 0, '入力対象日がありません。');
   state.stage = '画面・年月確認';

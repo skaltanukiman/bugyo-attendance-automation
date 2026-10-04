@@ -26,8 +26,8 @@ export async function launchEdge(settings: Settings['browser']): Promise<void> {
   await new Promise<void>((ready, reject) => { child.once('spawn', ready); child.once('error', reject); });
   child.unref();
 }
-export async function connectEdge(port: number): Promise<Browser> {
-  return chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 15000 });
+export async function connectEdge(port: number, timeout = 15000): Promise<Browser> {
+  return chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout });
 }
 export async function disconnect(browser: Browser): Promise<void> {
   // For connectOverCDP, Browser.close detaches the Playwright connection; it does not

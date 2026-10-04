@@ -5,7 +5,7 @@ import { daysInMonth, parseScreenPeriod } from '../utils/date.js';
 import { equals, normalize, normalized } from '../services/validationService.js';
 import type { InspectionSelectors, FieldKey } from './selectors.js';
 import { timeParts, decimalParts } from './splitInput.js';
-import { safeClick, unique } from './interactions.js';
+import { safeClick, unique, waitVisible } from './interactions.js';
 import { DraftListPage } from './draftListPage.js';
 export { safeClick } from './interactions.js';
 
@@ -33,6 +33,14 @@ export class AttendancePage implements AttendancePort {
       draftButtons: await this.draftButton().count(), rows: await this.root.locator(this.selectors.rows).count() };
   }
   draftButton() { return this.root.getByRole('button', { name: '下書き保存', exact: true }); }
+  async matchesSavedReturn(): Promise<boolean> {
+    if (this.selectors.saveMode !== 'reopenDraft') return false;
+    const marker = this.root.locator(this.selectors.returnMarker!).filter({ visible: true });
+    const entry = this.root.locator(this.selectors.draftList!.entry).filter({ visible: true });
+    const title = this.pageTitle();
+    return await title.count() === 1 && (await title.innerText()).trim() === '勤務実績申請' && await marker.count() === 1 && await entry.count() === 1 &&
+      await this.draftButton().count() === 0 && await this.root.locator(this.selectors.rows).count() === 0;
+  }
   async assertPeriod(period: Period, confirmYear: () => Promise<boolean>): Promise<void> {
     ensure(await this.matches(), '勤務実績申請画面を確認できません。');
     if (this.selectors.periodSource === 'rowDates') {
@@ -123,7 +131,7 @@ export class AttendancePage implements AttendancePort {
     }
   }
   async write(day: PlannedDay): Promise<void> {
-    ensure(this.selectors.verified || this.mode === 'trial', '未確認のセレクタでは入力できません。');
+    ensure(this.mode !== 'verifyDraft' && (this.selectors.verified || this.mode === 'trial'), '再確認専用モードまたは未確認のセレクタでは入力できません。');
     const row = await this.row(day);
     let scope: Locator = row;
     if (this.selectors.editButton) {
@@ -176,10 +184,10 @@ export class AttendancePage implements AttendancePort {
       if (equals(actual, day.expected)) return actual;
       await new Promise(resolve => setTimeout(resolve, 100));
     } while (Date.now() < deadline);
-    ensure(false, `${day.record.date}: 入力後の値が期待値と一致しません。下書き保存しません。`);
+    ensure(false, `${day.record.date}: 読取値が期待値と一致しません。処理を停止します。`);
   }
   async saveDraft(period?: Period, plan?: PlannedDay[]): Promise<void> {
-    ensure(this.selectors.verified || this.mode === 'trial', '未確認のセレクタでは下書き保存できません。');
+    ensure(this.mode !== 'verifyDraft' && (this.selectors.verified || this.mode === 'trial'), '再確認専用モードまたは未確認のセレクタでは下書き保存できません。');
     if (this.selectors.saveMode === 'reopenDraft') {
       ensure(period && plan?.length, '下書き再読取には対象年月と入力予定が必要です。');
       await this.saveAndReopen(period, plan);
@@ -214,14 +222,19 @@ export class AttendancePage implements AttendancePort {
     const marker = this.root.locator(this.selectors.returnMarker!);
     ensure(await marker.count() === 0 || !(await marker.isVisible()), '既に保存後の画面が表示されています。');
     await safeClick(this.draftButton(), true);
-    await marker.waitFor({ state: 'visible' });
+    await this.reopenDraft(period, plan);
+  }
+  async reopenDraft(period: Period, plan: PlannedDay[]): Promise<void> {
+    ensure(this.selectors.saveMode === 'reopenDraft' && plan.length > 0, '下書き再読取の設定または入力予定がありません。');
+    const marker = this.root.locator(this.selectors.returnMarker!).filter({ visible: true });
+    await waitVisible(marker, '保存後画面の目印');
     await unique(marker, '保存後画面の目印');
     await this.draftButton().waitFor({ state: 'hidden' });
     ensure(await this.root.locator(this.selectors.rows).count() === 0, '保存後も入力画面が残っています。');
     await new DraftListPage(this.root, this.selectors.draftList!).openMonth(period);
     this.openedCodeValues.clear();
-    await this.pageTitle().waitFor({ state: 'visible' });
-    await this.draftButton().waitFor({ state: 'visible' });
+    await waitVisible(this.pageTitle(), '下書き再表示後の入力画面タイトル');
+    await waitVisible(this.draftButton(), '下書き再表示後の入力画面');
     await this.assertPeriod(period, async () => false);
     // Read only: saving again could conceal a failed first save.
     for (const day of plan) await this.verify(day);

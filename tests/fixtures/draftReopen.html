@@ -20,12 +20,24 @@ function editor(data) {
      for(const key of ['pattern','reason','start','end','break']) window.persisted[key] = document.querySelector(`[data-${key}]`).value;
      window.persisted.worked = document.querySelector('[data-worked]').textContent;
    }
-   document.body.innerHTML = `<h1>勤務実績申請</h1><label>申請期間</label><button type="button" class="count">下書き:${window.testMode==='new' ? 2 : 1}件</button>`;
-   document.querySelector('.count').onclick = list;
+   returned();
  };
+}
+function returned() {
+ document.body.innerHTML = '<h1>勤務実績申請</h1><label>申請期間</label>';
+ const entry=document.createElement('button'); entry.className='count'; entry.textContent=`下書き:${window.testMode==='new' ? 2 : 1}件`; entry.onclick=list;
+ if(window.testMode==='delayedEntry') {
+   const hidden=entry.cloneNode(true); hidden.hidden=true; document.body.append(hidden);
+   setTimeout(() => document.body.append(entry), 100);
+ } else document.body.append(entry);
 }
 function list() {
  document.body.innerHTML = '<h1>申請状況</h1><h1 hidden>申請状況</h1><table id="list"><tbody></tbody></table><p id="loaded">すべてのデータを取得しました。</p>';
+ if(window.testMode==='hiddenTemplates') {
+   const hidden=document.createElement('section'); hidden.hidden=true;
+   hidden.innerHTML='<p id="loaded">すべてのデータを取得しました。</p><button class="js-edit" data-actionlog-actiontype="申請書入力" type="button">申請書入力</button>';
+   document.body.append(hidden);
+ }
  const records = [
    { status: '下書き', month: 1 },
    { status: '承認待ち', month: 2 },

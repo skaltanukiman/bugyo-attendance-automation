@@ -6,7 +6,8 @@ import { selectorsSchema, selectorsForRun } from '../src/browser/selectors.js';
 import { executionMode } from '../src/domain/executionMode.js';
 import { AttendancePage } from '../src/browser/attendancePage.js';
 import { buildPlan } from '../src/services/validationService.js';
-import { enterAndSave, initialState } from '../src/services/attendanceService.js';
+import { enterAndSave, verifySavedDraft, initialState } from '../src/services/attendanceService.js';
+import { findAttendancePage } from '../src/browser/findAttendancePage.js';
 import { isWholeMonthRange } from '../src/utils/date.js';
 import { safeClick } from '../src/browser/interactions.js';
 import { codes } from './helpers.js';
@@ -45,6 +46,52 @@ test('件数があるだけで成功にせず、古い保存値なら退避条�
   await assert.rejects(() => enterAndSave(port, period, plan, '007', state, () => {}, async () => false), /期待値/);
   assert.equal(state.saved, false); assert.equal(state.backedUp, false);
   assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+}));
+test('保存後の入口が遅れて表示されても待機し、非表示のテンプレートは操作しない', async () => {
+  for (const mode of ['delayedEntry', 'hiddenTemplates']) await fixture(mode, async (page, port) => {
+    const state = initialState();
+    await enterAndSave(port, period, plan, '007', state, () => {}, async () => false);
+    assert.equal(state.saved, true);
+    assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 1, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+  });
+});
+test('保存済み下書きの再確認では入力・保存をせず、一致した場合だけ退避可能にする', async () => {
+  for (const matches of [true, false]) await fixture('existing', async (page) => {
+    await page.evaluate(matches => {
+      if (matches) (window as any).persisted = { pattern: '205', reason: '007', start: '10:15', end: '18:45', break: '1.50', worked: '7.00' };
+      (window as any).returned();
+    }, matches);
+    const recovery = selectorsForRun(config, 'verifyDraft');
+    assert.equal(recovery.verified, false);
+    const port = await findAttendancePage(browser, recovery, 'verifyDraft', () => {});
+    assert.equal(port.page, page);
+    const state = initialState();
+    if (matches) await verifySavedDraft(port, period, plan, state, () => {});
+    else await assert.rejects(() => verifySavedDraft(port, period, plan, state, () => {}), /期待値/);
+    assert.equal(state.saved, matches); assert.equal(state.verified, matches);
+    assert.equal(state.inputStarted, false); assert.equal(state.saveAttempted, false);
+    await assert.rejects(() => port.write(plan[0]), /未確認/);
+    await assert.rejects(() => port.saveDraft(period, plan), /未確認/);
+    const verifiedPort = new AttendancePage(page, config, 'verifyDraft');
+    await assert.rejects(() => verifiedPort.write(plan[0]), /再確認専用/);
+    await assert.rejects(() => verifiedPort.saveDraft(period, plan), /再確認専用/);
+    assert.deepEqual(await page.evaluate(() => (window as any).stats), { saves: 0, applications: 0, viewed: 1, opened: 1, deleted: 0 });
+  });
+});
+test('下書き一覧専用の許可でもフォーム送信・明示submit・申請・削除を拒否する', async () => fixture('existing', async (page) => {
+  await page.setContent('<form id="owner"></form><button id="entry">下書き:1件</button>');
+  const entry = page.locator('#entry');
+  await assert.rejects(() => safeClick(entry));
+  await safeClick(entry, 'draftList'); // Omitted type, no form owner.
+  await entry.evaluate(el => el.setAttribute('form', 'owner'));
+  await assert.rejects(() => safeClick(entry, 'draftList'), /非送信/);
+  await entry.evaluate(el => { el.removeAttribute('form'); el.setAttribute('type', 'submit'); });
+  await assert.rejects(() => safeClick(entry, 'draftList'), /非送信/);
+  await entry.evaluate(el => el.setAttribute('type', 'button'));
+  for (const name of ['申請', '削除', '勤務実績申請', '下書き保存']) {
+    await entry.evaluate((el, name) => el.textContent = name, name);
+    await assert.rejects(() => safeClick(entry, 'draftList'), /名称/);
+  }
 }));
 test('対象期間の重複・別月・承認待ち・部分期間を開かず停止する', async () => {
   for (const mode of ['duplicate','wrongMonth','approvedOnly','partial']) await fixture(mode, async (page, port) => {
@@ -99,6 +146,8 @@ test('通しテストを明示した場合だけ未確認設定で入力・保�
   const raw = { ...config, verified: false };
   assert.equal(executionMode([]), 'normal');
   assert.equal(executionMode(['--trial']), 'trial');
+  assert.equal(executionMode(['--verify-draft']), 'verifyDraft');
+  assert.throws(() => executionMode(['--trial', '--verify-draft']));
   assert.throws(() => executionMode(['--trial', '--unknown']));
   assert.throws(() => selectorsForRun(raw, 'normal'), /未確認/);
   assert.throws(() => selectorsForRun({ ...raw, draftList: null }, 'trial'), /不正/);
